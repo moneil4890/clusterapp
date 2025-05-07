@@ -1,5 +1,6 @@
 streamlit
 pandas
-langchain
-langchain-openai
-openai
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-community>=0.1.0
+openai>=1.0.0
