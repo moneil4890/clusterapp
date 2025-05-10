@@ -174,30 +174,6 @@ st.markdown("""
         background-color: #FEE2E2;
         color: #991B1B;
     }
-    
-    /* Loading animation */
-    .loading-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 2rem;
-    }
-    
-    .loading-spinner {
-        width: 50px;
-        height: 50px;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid #4F46E5;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 1rem;
-    }
-    
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -337,9 +313,9 @@ def generate_content_clusters(topic, difficulty):
     # Create the system prompt with more specific difficulty differentiation
     system_prompt = f"""
     Role: You are an experienced SEO specialist and content strategist with expertise in keyword difficulty analysis.
-    Task: Generate EXACTLY 20 content cluster keywords for the topic "{topic}" that STRICTLY match "{difficulty}" difficulty level.
+    Task: Generate strictly "{difficulty}" difficulty level content clusters for the topic "{topic}" with NO overlap with other difficulty levels.
     
-    CRITICAL: You MUST return EXACTLY 20 keywords. This is not negotiable. Count them carefully before finalizing.
+    CRITICAL: The user has reported issues with keywords not properly matching their stated difficulty levels. You MUST ensure EVERY keyword you generate is STRICTLY within the "{difficulty}" difficulty category as defined below.
     
     ---------------------------------------
     DETAILED SEO KEYWORD DIFFICULTY CRITERIA
@@ -356,7 +332,7 @@ def generate_content_clusters(topic, difficulty):
     - Examples: {difficulty_params["examples"]}
     
     Process:
-    1. Generate EXACTLY 20 content cluster keywords for "{topic}" that are STRICTLY {difficulty.upper()} difficulty level.
+    1. Generate 20 content cluster keywords for "{topic}" that are STRICTLY {difficulty.upper()} difficulty level.
     2. Double-check each keyword against ALL criteria above to ensure it truly fits the {difficulty} difficulty profile.
     3. Each keyword MUST include the main topic "{topic}" or a very close variant.
     4. The keywords should be:
@@ -365,7 +341,12 @@ def generate_content_clusters(topic, difficulty):
        c. Diverse to cover different aspects of the topic
        d. Suitable for creating multiple content pieces
     
-    FORMAT YOUR OUTPUT AS VALID JSON WITH EXACTLY THIS STRUCTURE:
+    FOR THE OUTPUT JSON:
+    - Include specific justification for WHY each keyword matches {difficulty.upper()} difficulty criteria
+    - Explicitly state the estimated search volume range, competition level, and word count
+    - Provide truly distinct article ideas that would work for each keyword
+    
+    Format results in this JSON schema:
     {{
         "keywords": [
             {{
@@ -377,26 +358,26 @@ def generate_content_clusters(topic, difficulty):
                 "article_idea_1": "Specific title and brief description of a potential article",
                 "article_idea_2": "Specific title and brief description of another potential article"
             }},
-            ... (REPEAT FOR EXACTLY 20 ITEMS TOTAL)
+            ...
         ]
     }}
     
-    FINAL CHECK: COUNT YOUR KEYWORDS. THERE MUST BE EXACTLY 20 KEYWORDS IN THE RESPONSE. NOT 19, NOT 21. EXACTLY 20.
+    IMPORTANT FINAL CHECK: Review your final list and REMOVE any keywords that could be classified in different difficulty categories. Every keyword MUST be undeniably a {difficulty.upper()} difficulty keyword.
     """
     
     # Create the user message
     user_prompt = f"""
-    Generate EXACTLY 20 content cluster keywords for the topic: {topic}. 
+    Generate 20 content cluster keywords for the topic: {topic}. 
     
-    I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics:
+    I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics. Previous results showed keywords that overlapped between difficulty levels.
+    
+    For {difficulty.upper()} difficulty keywords:
     - Word count: {difficulty_params["complexity"]}
     - Search volume: {difficulty_params["search_volume"]}
     - Competition: {difficulty_params["competition"]} 
     - KD score: {difficulty_params["kd_score"]}
     
-    Please verify each keyword against these criteria and include specific SEO metrics for each keyword. 
-    
-    IMPORTANT: You MUST return EXACTLY 20 keywords. Count them before finalizing.
+    Please verify each keyword against these criteria. Include specific SEO metrics for each keyword and explain exactly why it meets {difficulty.upper()} difficulty standards.
     """
     
     # Call the LLM
@@ -405,7 +386,6 @@ def generate_content_clusters(topic, difficulty):
         HumanMessage(content=user_prompt)
     ]
     
-    # First attempt
     response = llm.invoke(messages)
     
     # Parse the JSON response
@@ -418,114 +398,16 @@ def generate_content_clusters(topic, difficulty):
             json_str = response_text[json_start:json_end]
             result = json.loads(json_str)
         else:
-            # If no JSON found, try to extract it differently
-            import re
-            json_pattern = r'```json\s*([\s\S]*?)\s*```'
-            match = re.search(json_pattern, response_text)
-            if match:
-                json_str = match.group(1)
-                result = json.loads(json_str)
-            else:
-                # Last resort, assume the entire response might be JSON
-                result = json.loads(response_text)
-    except json.JSONDecodeError:
-        # If parsing fails, try again with a more explicit prompt
-        retry_prompt = f"""
-        There was an error parsing your previous response. Please provide EXACTLY 20 content cluster keywords for the topic "{topic}" with {difficulty} difficulty level.
-        
-        Format your response as VALID JSON with this structure:
-        {{
-            "keywords": [
-                {{
-                    "keyword": "Example keyword",
-                    "difficulty_level": "{difficulty}",
-                    "search_volume": "Estimated volume",
-                    "competition_level": "Competition level",
-                    "explanation": "Explanation",
-                    "article_idea_1": "Article idea 1",
-                    "article_idea_2": "Article idea 2"
-                }},
-                ... (REPEAT FOR EXACTLY 20 ITEMS)
-            ]
-        }}
-        
-        Return ONLY the JSON without any other text, explanation, or code blocks.
-        """
-        retry_messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt),
-            SystemMessage(content="Your previous response contained invalid JSON. Please provide only valid JSON."),
-            HumanMessage(content=retry_prompt)
-        ]
-        
-        response = llm.invoke(retry_messages)
-        response_text = response.content
-        
-        # Try to extract JSON again
-        json_start = response_text.find('{')
-        json_end = response_text.rfind('}') + 1
-        if json_start >= 0 and json_end > json_start:
-            json_str = response_text[json_start:json_end]
-            result = json.loads(json_str)
-        else:
-            st.error("Could not parse the API response as JSON after retry.")
+            # Fallback if no JSON found
+            st.error("The API response didn't contain properly formatted JSON data.")
             return None
+    except json.JSONDecodeError:
+        st.error("Could not parse the API response as JSON.")
+        return None
     
-    # Convert to DataFrame and ensure we have 20 keywords
+    # Convert to DataFrame
     if 'keywords' in result:
         df = pd.DataFrame(result['keywords'])
-        
-        # Check if we have exactly 20 keywords
-        if len(df) < 20:
-            # If we have less than 20, generate more
-            additional_needed = 20 - len(df)
-            
-            additional_prompt = f"""
-            We need {additional_needed} more content cluster keywords for the topic "{topic}" with {difficulty} difficulty level.
-            
-            These must be DIFFERENT from the ones you've already provided.
-            
-            Format the additional keywords using the same JSON structure as before:
-            {{
-                "keywords": [
-                    {{
-                        "keyword": "Example keyword",
-                        "difficulty_level": "{difficulty}",
-                        "search_volume": "Estimated volume",
-                        "competition_level": "Competition level",
-                        "explanation": "Explanation",
-                        "article_idea_1": "Article idea 1",
-                        "article_idea_2": "Article idea 2"
-                    }},
-                    ... (REPEAT FOR EXACTLY {additional_needed} ITEMS)
-                ]
-            }}
-            """
-            
-            additional_messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=additional_prompt)
-            ]
-            
-            additional_response = llm.invoke(additional_messages)
-            
-            try:
-                additional_text = additional_response.content
-                json_start = additional_text.find('{')
-                json_end = additional_text.rfind('}') + 1
-                if json_start >= 0 and json_end > json_start:
-                    additional_json_str = additional_text[json_start:json_end]
-                    additional_result = json.loads(additional_json_str)
-                    if 'keywords' in additional_result:
-                        additional_df = pd.DataFrame(additional_result['keywords'])
-                        # Combine the original and additional keywords
-                        df = pd.concat([df, additional_df], ignore_index=True)
-            except:
-                st.warning(f"We were only able to generate {len(df)} keywords. Continuing with what we have.")
-        
-        # If we have more than 20, trim to 20
-        if len(df) > 20:
-            df = df.head(20)
         
         # Add a numbered index starting from 1 instead of 0
         df.index = df.index + 1
@@ -543,23 +425,7 @@ if submit_button:
     else:
         with st.spinner(f"✨ Generating {difficulty.lower()} difficulty content clusters... This may take a minute."):
             try:
-                # Display a custom loading message
-                col1, col2, col3 = st.columns([1,2,1])
-                with col2:
-                    st.markdown("""
-                    <div class="loading-container">
-                        <div class="loading-spinner"></div>
-                        <p>Creating 20 relevant content clusters...</p>
-                        <p><small>This usually takes 30-60 seconds</small></p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                # Generate content clusters
                 df = generate_content_clusters(topic, difficulty)
-                
-                # Clear the loading message
-                st.empty()
-                
                 if df is not None:
                     # Success message
                     st.markdown(f"""
@@ -607,33 +473,6 @@ if submit_button:
                             mime="text/csv",
                             use_container_width=True,
                         )
-                        
-                        # Add option to generate another difficulty level
-                        st.write("---")
-                        st.write("Need more content ideas?")
-                        
-                        other_difficulties = [d for d in ["Low", "Medium", "High"] if d != difficulty]
-                        cols = st.columns(2)
-                        
-                        for i, other_diff in enumerate(other_difficulties):
-                            with cols[i]:
-                                if other_diff == "Low":
-                                    btn_color = "low-difficulty"
-                                elif other_diff == "Medium":
-                                    btn_color = "medium-difficulty"
-                                else:
-                                    btn_color = "high-difficulty"
-                                
-                                st.markdown(f"""
-                                <a href="?topic={topic}&difficulty={other_diff}" target="_self" style="text-decoration:none;">
-                                    <button class="stButton" style="width:100%">
-                                        <span class="difficulty-badge {btn_color}" style="margin:0;">{other_diff}</span>
-                                        Generate {other_diff} Difficulty
-                                    </button>
-                                </a>
-                                """, unsafe_allow_html=True)
-                else:
-                    st.error("There was a problem generating content clusters. Please try again.")
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
 
