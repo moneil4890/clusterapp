@@ -203,11 +203,25 @@ with st.sidebar:
     3. Click "Generate Content Clusters"
     4. Download your results as CSV
     
-    #### Difficulty Levels:
+    #### Difficulty Levels (SEO Standard):
     
-    - **Low**: Long-tail keywords with lower search volume but easier to rank for
-    - **Medium**: Moderately competitive terms with decent search volume
-    - **High**: Competitive keywords with high search volume and stronger competition
+    - **Low**: 
+      - 4+ words, specific phrases
+      - 10-300 monthly searches
+      - KD score below 30
+      - Minimal competition
+    
+    - **Medium**: 
+      - 3-4 words, focused phrases
+      - 300-1,000 monthly searches
+      - KD score 30-60
+      - Moderate competition
+    
+    - **High**: 
+      - 1-2 words, broader terms
+      - 1,000+ monthly searches
+      - KD score above 60
+      - Strong competition, major sites
     
     #### Benefits:
     
@@ -256,24 +270,36 @@ st.markdown('</div>', unsafe_allow_html=True)
 def get_difficulty_parameters(difficulty):
     if difficulty == "Low":
         return {
-            "description": "long-tail keywords with lower competition that are easier to rank for",
-            "search_volume": "lower to moderate search volume (typically 10-500 monthly searches)",
-            "complexity": "more specific, longer phrases (often 4+ words)",
-            "examples": "beginner-friendly tutorials, how-to guides for specific tasks, niche subtopics"
+            "description": "long-tail, specific keywords with minimal competition that are much easier to rank for",
+            "search_volume": "lower search volume (typically 10-300 monthly searches)",
+            "complexity": "highly specific, longer phrases (typically 4+ words)",
+            "examples": "very specific how-to guides, niche questions, micro-topics with limited competition",
+            "competition": "low competition score (0-30%), few established websites ranking for these terms",
+            "kd_score": "KD (Keyword Difficulty) score below 30",
+            "serp_features": "fewer SERP features, less established content",
+            "intent": "often highly specific informational or long-tail transactional intent"
         }
     elif difficulty == "Medium":
         return {
-            "description": "moderately competitive terms with decent traffic potential",
-            "search_volume": "moderate search volume (typically 500-2,000 monthly searches)",
-            "complexity": "slightly more focused phrases (usually 2-4 words)",
-            "examples": "more specific questions, comparison posts, specialized guides"
+            "description": "moderately competitive terms with decent traffic potential but still attainable",
+            "search_volume": "moderate search volume (typically 300-1,000 monthly searches)",
+            "complexity": "more focused mid-tail phrases (usually 3-4 words)",
+            "examples": "specific questions, comparison posts, focused topic guides with moderate competition",
+            "competition": "medium competition score (30-60%), some established websites but ranking opportunities exist",
+            "kd_score": "KD (Keyword Difficulty) score between 30-60",
+            "serp_features": "some SERP features, moderate content quality needed",
+            "intent": "mix of informational and commercial intent"
         }
     else:  # High
         return {
-            "description": "highly competitive keywords with strong traffic potential",
-            "search_volume": "high search volume (typically 2,000+ monthly searches)",
-            "complexity": "shorter, broader terms (often 1-3 words)",
-            "examples": "comprehensive guides, authoritative resources, popular product reviews"
+            "description": "highly competitive keywords with strong traffic potential but difficult to rank for",
+            "search_volume": "high search volume (typically 1,000+ monthly searches)",
+            "complexity": "shorter, broader terms (often 1-2 words)",
+            "examples": "major topic guides, competitive reviews, popular products or services",
+            "competition": "high competition score (60%+), many established websites with high authority",
+            "kd_score": "KD (Keyword Difficulty) score above 60",
+            "serp_features": "many SERP features, highly optimized content required",
+            "intent": "often commercial or navigational intent with high competition"
         }
 
 # Function to generate content clusters
@@ -286,46 +312,73 @@ def generate_content_clusters(topic, difficulty):
     
     # Create the system prompt with more specific difficulty differentiation
     system_prompt = f"""
-    Role: You are an experienced SEO specialist and content strategist.
-    Task: Your task is to help identify popular and relevant content clusters within a specific topic area. You'll generate a list of high-value keywords that can be used to create multiple articles, focusing on terms with good search volume and relevance to the target audience.
-    Context: Users are looking to create comprehensive content strategies around a single topic. They need guidance in identifying related subtopics and keywords that will allow them to create a network of interconnected, valuable content.
+    Role: You are an experienced SEO specialist and content strategist with expertise in keyword difficulty analysis.
+    Task: Generate strictly "{difficulty}" difficulty level content clusters for the topic "{topic}" with NO overlap with other difficulty levels.
     
-    IMPORTANT: The user has requested "{difficulty}" difficulty level keywords for "{topic}". Make sure ALL keywords you generate are strictly within this difficulty range and do not overlap with other difficulty levels.
+    CRITICAL: The user has reported issues with keywords not properly matching their stated difficulty levels. You MUST ensure EVERY keyword you generate is STRICTLY within the "{difficulty}" difficulty category as defined below.
     
-    Difficulty Level Specifications for "{difficulty}" keywords:
-    - These are {difficulty_params["description"]}
-    - They typically have {difficulty_params["search_volume"]}
-    - Format: {difficulty_params["complexity"]}
-    - Examples of content types: {difficulty_params["examples"]}
+    ---------------------------------------
+    DETAILED SEO KEYWORD DIFFICULTY CRITERIA
+    ---------------------------------------
+    
+    FOR {difficulty.upper()} DIFFICULTY KEYWORDS:
+    - Description: {difficulty_params["description"]}
+    - Search Volume: {difficulty_params["search_volume"]}
+    - Word Count/Format: {difficulty_params["complexity"]}
+    - Competition Level: {difficulty_params["competition"]}
+    - Keyword Difficulty Score: {difficulty_params["kd_score"]}
+    - SERP Features: {difficulty_params["serp_features"]}
+    - User Intent: {difficulty_params["intent"]}
+    - Examples: {difficulty_params["examples"]}
     
     Process:
-    1. Generate 20 related keywords or phrases that represent potential content clusters within "{topic}".
-    2. ALL keywords MUST be {difficulty.lower()} difficulty level as defined above, with NO overlap with other difficulty levels.
-    3. The keywords should also:
-       a. Include the main topic keywords in almost 100% of cases
-       b. Be popular and frequently searched
-       c. Be relevant to the main topic
-       d. Be diverse enough to cover different aspects or subtopics
-       e. Be suitable for creating multiple pieces of content
-    4. Present the results in a structured JSON format with the following schema:
+    1. Generate 20 content cluster keywords for "{topic}" that are STRICTLY {difficulty.upper()} difficulty level.
+    2. Double-check each keyword against ALL criteria above to ensure it truly fits the {difficulty} difficulty profile.
+    3. Each keyword MUST include the main topic "{topic}" or a very close variant.
+    4. The keywords should be:
+       a. Genuinely popular and searched (not fabricated terms)
+       b. Directly relevant to "{topic}"
+       c. Diverse to cover different aspects of the topic
+       d. Suitable for creating multiple content pieces
+    
+    FOR THE OUTPUT JSON:
+    - Include specific justification for WHY each keyword matches {difficulty.upper()} difficulty criteria
+    - Explicitly state the estimated search volume range, competition level, and word count
+    - Provide truly distinct article ideas that would work for each keyword
+    
+    Format results in this JSON schema:
     {{
         "keywords": [
             {{
-                "keyword": "Example Keyword",
+                "keyword": "Example {difficulty} Difficulty Keyword",
                 "difficulty_level": "{difficulty}",
-                "explanation": "Why this keyword is important and why it's a {difficulty.lower()} difficulty keyword",
-                "article_idea_1": "Title and brief description of a potential article",
-                "article_idea_2": "Title and brief description of another potential article"
+                "search_volume": "Estimated volume of XXX-XXX searches per month",
+                "competition_level": "XX% - {difficulty} competition",
+                "explanation": "Detailed explanation of why this is a {difficulty.lower()} difficulty keyword with specific SEO metrics",
+                "article_idea_1": "Specific title and brief description of a potential article",
+                "article_idea_2": "Specific title and brief description of another potential article"
             }},
             ...
         ]
     }}
     
-    Again, please ensure EVERY keyword is truly a {difficulty.lower()} difficulty level keyword. Double-check each one against the criteria above.
+    IMPORTANT FINAL CHECK: Review your final list and REMOVE any keywords that could be classified in different difficulty categories. Every keyword MUST be undeniably a {difficulty.upper()} difficulty keyword.
     """
     
     # Create the user message
-    user_prompt = f"Please generate 20 content cluster keywords for the topic: {topic}. I need ONLY {difficulty.lower()} difficulty level keywords that don't overlap with other difficulty levels."
+    user_prompt = f"""
+    Generate 20 content cluster keywords for the topic: {topic}. 
+    
+    I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics. Previous results showed keywords that overlapped between difficulty levels.
+    
+    For {difficulty.upper()} difficulty keywords:
+    - Word count: {difficulty_params["complexity"]}
+    - Search volume: {difficulty_params["search_volume"]}
+    - Competition: {difficulty_params["competition"]} 
+    - KD score: {difficulty_params["kd_score"]}
+    
+    Please verify each keyword against these criteria. Include specific SEO metrics for each keyword and explain exactly why it meets {difficulty.upper()} difficulty standards.
+    """
     
     # Call the LLM
     messages = [
@@ -397,6 +450,8 @@ if submit_button:
                                 "number": st.column_config.NumberColumn("No.", width="small"),
                                 "keyword": st.column_config.TextColumn("Keyword", width="medium"),
                                 "difficulty_level": st.column_config.TextColumn("Difficulty", width="small"),
+                                "search_volume": st.column_config.TextColumn("Search Volume", width="medium"),
+                                "competition_level": st.column_config.TextColumn("Competition", width="medium"),
                                 "explanation": st.column_config.TextColumn("Explanation", width="large"),
                                 "article_idea_1": st.column_config.TextColumn("Article Idea 1", width="large"),
                                 "article_idea_2": st.column_config.TextColumn("Article Idea 2", width="large")
