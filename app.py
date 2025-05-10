@@ -355,6 +355,13 @@ def generate_content_clusters(topic, difficulty):
     # Convert to DataFrame
     if 'keywords' in result:
         df = pd.DataFrame(result['keywords'])
+        
+        # Add a numbered index starting from 1 instead of 0
+        df.index = df.index + 1
+        
+        # Reset index to create a column with numbering starting from 1
+        df = df.reset_index().rename(columns={"index": "number"})
+        
         return df
     return None
 
@@ -387,6 +394,7 @@ if submit_button:
                         st.dataframe(
                             df,
                             column_config={
+                                "number": st.column_config.NumberColumn("No.", width="small"),
                                 "keyword": st.column_config.TextColumn("Keyword", width="medium"),
                                 "difficulty_level": st.column_config.TextColumn("Difficulty", width="small"),
                                 "explanation": st.column_config.TextColumn("Explanation", width="large"),
