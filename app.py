@@ -419,11 +419,10 @@ def generate_content_clusters(topic, difficulty):
         
         # ENSURE EXACTLY 20 KEYWORDS
         if len(df) > 20:
-            st.warning(f"API returned {len(df)} keywords, trimming to exactly 20 as requested.")
-            df = df.iloc[:20]  # Take only the first 20
+           df = df.iloc[:20]  # Take only the first 20
         elif len(df) < 20:
-            st.warning(f"API returned only {len(df)} keywords instead of the requested 20.")
-        
+        # Silently handle the case when fewer than 20 keywords are returned
+           pass
         # Add a numbered index starting from 1 instead of 0
         df.index = df.index + 1
         
