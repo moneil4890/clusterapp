@@ -402,7 +402,8 @@ if submit_button:
                                 "article_idea_2": st.column_config.TextColumn("Article Idea 2", width="large")
                             },
                             use_container_width=True,
-                            height=400
+                            height=400,
+                            hide_index=True
                         )
                         st.markdown('</div>', unsafe_allow_html=True)
                     
