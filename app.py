@@ -329,7 +329,7 @@ def get_difficulty_parameters(difficulty):
 # Function to generate content clusters
 def generate_content_clusters(topic, difficulty):
     # Set up LangChain with OpenAI
-    llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo-16k")
+    llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
     
     # Get difficulty-specific parameters
     difficulty_params = get_difficulty_parameters(difficulty)
