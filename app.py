@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage, SystemMessage
 import json
 import os
 
@@ -152,6 +152,28 @@ st.markdown("""
         margin: 0.5rem 0 1.5rem 0;
         width: 100px;
     }
+    
+    /* Difficulty badge styles */
+    .difficulty-badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+        margin-left: 10px;
+    }
+    .low-difficulty {
+        background-color: #D1FAE5;
+        color: #065F46;
+    }
+    .medium-difficulty {
+        background-color: #FEF3C7;
+        color: #92400E;
+    }
+    .high-difficulty {
+        background-color: #FEE2E2;
+        color: #991B1B;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -180,6 +202,12 @@ with st.sidebar:
     2. Select the keyword difficulty level
     3. Click "Generate Content Clusters"
     4. Download your results as CSV
+    
+    #### Difficulty Levels:
+    
+    - **Low**: Long-tail keywords with lower search volume but easier to rank for
+    - **Medium**: Moderately competitive terms with decent search volume
+    - **High**: Competitive keywords with high search volume and stronger competition
     
     #### Benefits:
     
@@ -210,35 +238,82 @@ with st.form("cluster_form"):
             ["Low", "Medium", "High"],
             help="Low difficulty keywords are easier to rank for, while high difficulty keywords are more competitive but may have higher search volume."
         )
+        
+        # Display visual indicator of selected difficulty
+        if difficulty == "Low":
+            badge_color = "low-difficulty"
+        elif difficulty == "Medium":
+            badge_color = "medium-difficulty"
+        else:
+            badge_color = "high-difficulty"
+        
+        st.markdown(f'<span class="difficulty-badge {badge_color}">{difficulty}</span>', unsafe_allow_html=True)
     
     submit_button = st.form_submit_button("✨ Generate Content Clusters")
 st.markdown('</div>', unsafe_allow_html=True)
+
+# Function to get difficulty-specific parameters
+def get_difficulty_parameters(difficulty):
+    if difficulty == "Low":
+        return {
+            "description": "long-tail keywords with lower competition that are easier to rank for",
+            "search_volume": "lower to moderate search volume (typically 10-500 monthly searches)",
+            "complexity": "more specific, longer phrases (often 4+ words)",
+            "examples": "beginner-friendly tutorials, how-to guides for specific tasks, niche subtopics"
+        }
+    elif difficulty == "Medium":
+        return {
+            "description": "moderately competitive terms with decent traffic potential",
+            "search_volume": "moderate search volume (typically 500-2,000 monthly searches)",
+            "complexity": "slightly more focused phrases (usually 2-4 words)",
+            "examples": "more specific questions, comparison posts, specialized guides"
+        }
+    else:  # High
+        return {
+            "description": "highly competitive keywords with strong traffic potential",
+            "search_volume": "high search volume (typically 2,000+ monthly searches)",
+            "complexity": "shorter, broader terms (often 1-3 words)",
+            "examples": "comprehensive guides, authoritative resources, popular product reviews"
+        }
 
 # Function to generate content clusters
 def generate_content_clusters(topic, difficulty):
     # Set up LangChain with OpenAI
     llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
     
-    # Create the system prompt
-    system_prompt = """
+    # Get difficulty-specific parameters
+    difficulty_params = get_difficulty_parameters(difficulty)
+    
+    # Create the system prompt with more specific difficulty differentiation
+    system_prompt = f"""
     Role: You are an experienced SEO specialist and content strategist.
     Task: Your task is to help identify popular and relevant content clusters within a specific topic area. You'll generate a list of high-value keywords that can be used to create multiple articles, focusing on terms with good search volume and relevance to the target audience.
     Context: Users are looking to create comprehensive content strategies around a single topic. They need guidance in identifying related subtopics and keywords that will allow them to create a network of interconnected, valuable content.
     
+    IMPORTANT: The user has requested "{difficulty}" difficulty level keywords for "{topic}". Make sure ALL keywords you generate are strictly within this difficulty range and do not overlap with other difficulty levels.
+    
+    Difficulty Level Specifications for "{difficulty}" keywords:
+    - These are {difficulty_params["description"]}
+    - They typically have {difficulty_params["search_volume"]}
+    - Format: {difficulty_params["complexity"]}
+    - Examples of content types: {difficulty_params["examples"]}
+    
     Process:
-    1. The user has provided their main topic of interest.
-    2. Generate 20 related keywords or phrases that represent potential content clusters within that topic. They should be {difficulty} level of difficulty to rank for. The keywords should also:
+    1. Generate 20 related keywords or phrases that represent potential content clusters within "{topic}".
+    2. ALL keywords MUST be {difficulty.lower()} difficulty level as defined above, with NO overlap with other difficulty levels.
+    3. The keywords should also:
        a. Include the main topic keywords in almost 100% of cases
        b. Be popular and frequently searched
        c. Be relevant to the main topic
        d. Be diverse enough to cover different aspects or subtopics
        e. Be suitable for creating multiple pieces of content
-    3. Present the results in a structured JSON format with the following schema:
+    4. Present the results in a structured JSON format with the following schema:
     {{
         "keywords": [
             {{
                 "keyword": "Example Keyword",
-                "explanation": "Why this keyword is important",
+                "difficulty_level": "{difficulty}",
+                "explanation": "Why this keyword is important and why it's a {difficulty.lower()} difficulty keyword",
                 "article_idea_1": "Title and brief description of a potential article",
                 "article_idea_2": "Title and brief description of another potential article"
             }},
@@ -246,17 +321,11 @@ def generate_content_clusters(topic, difficulty):
         ]
     }}
     
-    Tips:
-    - Focus on keywords that have good search volume but aren't too broad or competitive.
-    - Consider different user intents and stages of the user journey when selecting keywords.
-    - Avoid overly niche or obscure terms that might not have broad appeal.
-    - Think about how the keywords can be interlinked to create a comprehensive content structure.
+    Again, please ensure EVERY keyword is truly a {difficulty.lower()} difficulty level keyword. Double-check each one against the criteria above.
     """
     
-    system_prompt = system_prompt.replace("{difficulty}", difficulty.lower())
-    
     # Create the user message
-    user_prompt = f"Please generate 20 content cluster keywords for the topic: {topic}. I need keywords with {difficulty.lower()} difficulty level."
+    user_prompt = f"Please generate 20 content cluster keywords for the topic: {topic}. I need ONLY {difficulty.lower()} difficulty level keywords that don't overlap with other difficulty levels."
     
     # Call the LLM
     messages = [
@@ -294,7 +363,7 @@ if submit_button:
     if not topic:
         st.error("Please enter a main topic of interest.")
     else:
-        with st.spinner("✨ Generating content clusters... This may take a minute."):
+        with st.spinner(f"✨ Generating {difficulty.lower()} difficulty content clusters... This may take a minute."):
             try:
                 df = generate_content_clusters(topic, difficulty)
                 if df is not None:
@@ -306,6 +375,10 @@ if submit_button:
                     </div>
                     """, unsafe_allow_html=True)
                     
+                    # Add a difficulty badge column
+                    if 'difficulty_level' not in df.columns:
+                        df['difficulty_level'] = difficulty
+                    
                     # Display the results in a nice table
                     st.subheader("Your Content Clusters")
                     st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
@@ -315,6 +388,7 @@ if submit_button:
                             df,
                             column_config={
                                 "keyword": st.column_config.TextColumn("Keyword", width="medium"),
+                                "difficulty_level": st.column_config.TextColumn("Difficulty", width="small"),
                                 "explanation": st.column_config.TextColumn("Explanation", width="large"),
                                 "article_idea_1": st.column_config.TextColumn("Article Idea 1", width="large"),
                                 "article_idea_2": st.column_config.TextColumn("Article Idea 2", width="large")
@@ -331,7 +405,7 @@ if submit_button:
                         st.download_button(
                             label="📥 Download Content Clusters as CSV",
                             data=csv,
-                            file_name=f"{topic.replace(' ', '_')}_content_clusters.csv",
+                            file_name=f"{topic.replace(' ', '_')}_{difficulty.lower()}_difficulty_content_clusters.csv",
                             mime="text/csv",
                             use_container_width=True,
                         )
