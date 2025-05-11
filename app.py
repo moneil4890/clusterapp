@@ -206,13 +206,13 @@ with st.sidebar:
     #### Difficulty Levels (SEO Standard):
     
     - **Low**: 
-      - 4+ words, specific phrases
+      - 1-2 words, more specific phrases
       - 10-300 monthly searches
       - KD score below 30
       - Minimal competition
     
     - **Medium**: 
-      - 3-4 words, focused phrases
+      - 1-2 words, focused phrases
       - 300-1,000 monthly searches
       - KD score 30-60
       - Moderate competition
@@ -270,21 +270,21 @@ st.markdown('</div>', unsafe_allow_html=True)
 def get_difficulty_parameters(difficulty):
     if difficulty == "Low":
         return {
-            "description": "long-tail, specific keywords with minimal competition that are much easier to rank for",
+            "description": "more specific, short keywords with minimal competition that are easier to rank for",
             "search_volume": "lower search volume (typically 10-300 monthly searches)",
-            "complexity": "highly specific, longer phrases (typically 4+ words)",
-            "examples": "very specific how-to guides, niche questions, micro-topics with limited competition",
+            "complexity": "1-2 words, specific phrase combinations",
+            "examples": "specific industry terms, niche phrases with limited competition",
             "competition": "low competition score (0-30%), few established websites ranking for these terms",
             "kd_score": "KD (Keyword Difficulty) score below 30",
             "serp_features": "fewer SERP features, less established content",
-            "intent": "often highly specific informational or long-tail transactional intent"
+            "intent": "often specific informational or niche transactional intent"
         }
     elif difficulty == "Medium":
         return {
             "description": "moderately competitive terms with decent traffic potential but still attainable",
             "search_volume": "moderate search volume (typically 300-1,000 monthly searches)",
-            "complexity": "more focused mid-tail phrases (usually 3-4 words)",
-            "examples": "specific questions, comparison posts, focused topic guides with moderate competition",
+            "complexity": "1-2 words, focused industry-specific phrases",
+            "examples": "industry terms, product types, solutions with moderate competition",
             "competition": "medium competition score (30-60%), some established websites but ranking opportunities exist",
             "kd_score": "KD (Keyword Difficulty) score between 30-60",
             "serp_features": "some SERP features, moderate content quality needed",
@@ -294,8 +294,8 @@ def get_difficulty_parameters(difficulty):
         return {
             "description": "highly competitive keywords with strong traffic potential but difficult to rank for",
             "search_volume": "high search volume (typically 1,000+ monthly searches)",
-            "complexity": "shorter, broader terms (often 1-2 words)",
-            "examples": "major topic guides, competitive reviews, popular products or services",
+            "complexity": "1-2 words, broader industry terms",
+            "examples": "major topic terms, popular products or services",
             "competition": "high competition score (60%+), many established websites with high authority",
             "kd_score": "KD (Keyword Difficulty) score above 60",
             "serp_features": "many SERP features, highly optimized content required",
@@ -317,7 +317,9 @@ def generate_content_clusters(topic, difficulty):
 
     CRITICAL: 
     - You MUST output EXACTLY 20 keywords, no more and no less.
-    - The user has reported issues with keywords not properly matching their stated difficulty levels. You MUST ensure EVERY keyword you generate is STRICTLY within the "{difficulty}" difficulty category as defined below.
+    - ALL keywords MUST be exactly 1-2 words only, regardless of difficulty level.
+    - Each keyword MUST be STRICTLY within the "{difficulty}" difficulty category as defined below.
+    - Keywords for each difficulty level must be distinct from keywords that would be appropriate for other difficulty levels.
 
     ---------------------------------------
     DETAILED SEO KEYWORD DIFFICULTY CRITERIA
@@ -326,7 +328,7 @@ def generate_content_clusters(topic, difficulty):
     FOR {difficulty.upper()} DIFFICULTY KEYWORDS:
     - Description: {difficulty_params["description"]}
     - Search Volume: {difficulty_params["search_volume"]}
-    - Word Count/Format: {difficulty_params["complexity"]}
+    - Word Count/Format: {difficulty_params["complexity"]} (MUST BE ONLY 1-2 WORDS)
     - Competition Level: {difficulty_params["competition"]}
     - Keyword Difficulty Score: {difficulty_params["kd_score"]}
     - SERP Features: {difficulty_params["serp_features"]}
@@ -335,9 +337,10 @@ def generate_content_clusters(topic, difficulty):
 
     Process:
     1. Generate EXACTLY 20 content cluster keywords for "{topic}" that are STRICTLY {difficulty.upper()} difficulty level.
-    2. Double-check each keyword against ALL criteria above to ensure it truly fits the {difficulty} difficulty profile.
-    3. Each keyword MUST include the main topic "{topic}" or a very close variant.
-    4. The keywords should be:
+    2. EVERY keyword MUST be exactly 1-2 words long - this is mandatory.
+    3. Double-check each keyword against ALL criteria above to ensure it truly fits the {difficulty} difficulty profile.
+    4. Each keyword MUST be related to the main topic "{topic}".
+    5. The keywords should be:
        a. Genuinely popular and searched (not fabricated terms)
        b. Directly relevant to "{topic}"
        c. Diverse to cover different aspects of the topic
@@ -367,25 +370,29 @@ def generate_content_clusters(topic, difficulty):
 
     IMPORTANT FINAL CHECK: 
     1. Count your keywords to confirm you have EXACTLY 20 entries
-    2. Review your final list and REMOVE any keywords that could be classified in different difficulty categories. Every keyword MUST be undeniably a {difficulty.upper()} difficulty keyword.
-    3. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
+    2. Verify EVERY keyword is exactly 1-2 words only
+    3. Review your final list and REMOVE any keywords that could be classified in different difficulty categories
+    4. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
     """
     
     # Create the user message
     user_prompt = f"""
     Generate EXACTLY 20 content cluster keywords for the topic: {topic}. 
     
-    I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics. Previous results showed keywords that overlapped between difficulty levels.
+    CRITICAL REQUIREMENTS:
+    1. ALL keywords MUST be exactly 1-2 words long - no exceptions
+    2. I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics
+    3. These keywords must be distinctly different from what would be found in other difficulty levels
     
     For {difficulty.upper()} difficulty keywords:
-    - Word count: {difficulty_params["complexity"]}
+    - Word count: EXACTLY 1-2 words only
     - Search volume: {difficulty_params["search_volume"]}
     - Competition: {difficulty_params["competition"]} 
     - KD score: {difficulty_params["kd_score"]}
     
     Please verify each keyword against these criteria. Include specific SEO metrics for each keyword and explain exactly why it meets {difficulty.upper()} difficulty standards.
     
-    REMEMBER: I need EXACTLY 20 keywords, no more, no less.
+    REMEMBER: I need EXACTLY 20 keywords, no more, no less, all exactly 1-2 words.
     """
     
     # Call the LLM
@@ -421,8 +428,9 @@ def generate_content_clusters(topic, difficulty):
         if len(df) > 20:
            df = df.iloc[:20]  # Take only the first 20
         elif len(df) < 20:
-        # Silently handle the case when fewer than 20 keywords are returned
+           # Silently handle the case when fewer than 20 keywords are returned
            pass
+           
         # Add a numbered index starting from 1 instead of 0
         df.index = df.index + 1
         
