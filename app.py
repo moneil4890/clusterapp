@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for a more beautiful and aesthetic look
+# Custom CSS (unchanged)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -174,8 +174,72 @@ st.markdown("""
         background-color: #FEE2E2;
         color: #991B1B;
     }
+    
+    /* Difficulty tabs */
+    .difficulty-tabs {
+        display: flex;
+        margin-bottom: 20px;
+    }
+    
+    .difficulty-tab {
+        flex: 1;
+        text-align: center;
+        padding: 10px;
+        cursor: pointer;
+        border: 1px solid #E5E7EB;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .difficulty-tab:first-child {
+        border-radius: 8px 0 0 8px;
+    }
+    
+    .difficulty-tab:last-child {
+        border-radius: 0 8px 8px 0;
+    }
+    
+    .difficulty-tab.active-low {
+        background-color: #D1FAE5;
+        color: #065F46;
+        border-color: #A7F3D0;
+    }
+    
+    .difficulty-tab.active-medium {
+        background-color: #FEF3C7;
+        color: #92400E;
+        border-color: #FDE68A;
+    }
+    
+    .difficulty-tab.active-high {
+        background-color: #FEE2E2;
+        color: #991B1B;
+        border-color: #FECACA;
+    }
+    
+    .info-card {
+        background-color: #EFF6FF;
+        border-left: 5px solid #3B82F6;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# Initialize session state to store generated clusters across difficulties
+if 'generated_clusters' not in st.session_state:
+    st.session_state.generated_clusters = {
+        'Low': None,
+        'Medium': None,
+        'High': None
+    }
+    
+if 'last_topic' not in st.session_state:
+    st.session_state.last_topic = None
+    
+if 'all_keywords' not in st.session_state:
+    st.session_state.all_keywords = set()
 
 # Hero section
 st.markdown('<div class="hero-section">', unsafe_allow_html=True)
@@ -199,8 +263,8 @@ with st.sidebar:
     #### How to use this app:
     
     1. Enter your main topic of interest
-    2. Select the keyword difficulty level
-    3. Click "Generate Content Clusters"
+    2. Click "Generate Content Clusters"
+    3. Switch between difficulty tabs to see different keyword options
     4. Download your results as CSV
     
     #### Difficulty Levels (SEO Standard):
@@ -241,29 +305,8 @@ st.subheader("Generate Your Content Clusters")
 st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
 
 with st.form("cluster_form"):
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        topic = st.text_input("Main Topic of Interest", placeholder="e.g., Organic Gardening")
-    
-    with col2:
-        difficulty = st.selectbox(
-            "Keyword Difficulty",
-            ["Low", "Medium", "High"],
-            help="Low difficulty keywords are easier to rank for, while high difficulty keywords are more competitive but may have higher search volume."
-        )
-        
-        # Display visual indicator of selected difficulty
-        if difficulty == "Low":
-            badge_color = "low-difficulty"
-        elif difficulty == "Medium":
-            badge_color = "medium-difficulty"
-        else:
-            badge_color = "high-difficulty"
-        
-        st.markdown(f'<span class="difficulty-badge {badge_color}">{difficulty}</span>', unsafe_allow_html=True)
-    
-    submit_button = st.form_submit_button("✨ Generate Content Clusters")
+    topic = st.text_input("Main Topic of Interest", placeholder="e.g., Organic Gardening")
+    submit_button = st.form_submit_button("✨ Generate Content Clusters for All Difficulty Levels")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Function to get difficulty-specific parameters
@@ -302,8 +345,25 @@ def get_difficulty_parameters(difficulty):
             "intent": "often commercial or navigational intent with high competition"
         }
 
-# Function to generate content clusters
-def generate_content_clusters(topic, difficulty):
+# Function to generate content clusters for all difficulty levels
+def generate_all_content_clusters(topic):
+    all_clusters = {}
+    all_keywords_set = set()
+    
+    for difficulty in ["Low", "Medium", "High"]:
+        df = generate_content_clusters(topic, difficulty, all_keywords_set)
+        if df is not None:
+            all_clusters[difficulty] = df
+            # Add these keywords to our overall set to avoid duplication
+            all_keywords_set.update(df['keyword'].str.lower().tolist())
+    
+    return all_clusters, all_keywords_set
+
+# Function to generate content clusters for a specific difficulty
+def generate_content_clusters(topic, difficulty, existing_keywords=None):
+    if existing_keywords is None:
+        existing_keywords = set()
+        
     # Set up LangChain with OpenAI
     llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
     
@@ -377,7 +437,8 @@ def generate_content_clusters(topic, difficulty):
     5. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
     """
     
-    # Create the user message
+    # Create the user message with emphasis on avoiding existing keywords
+    existing_keywords_list = ", ".join(f'"{k}"' for k in existing_keywords)
     user_prompt = f"""
     Generate EXACTLY 20 content cluster keywords for the topic: {topic}. 
     
@@ -386,6 +447,7 @@ def generate_content_clusters(topic, difficulty):
     2. Include a mix of both single-word keywords and two-word keywords.
     3. I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics
     4. These keywords must be distinctly different from what would be found in other difficulty levels
+    5. DO NOT USE any of the following keywords that have already been generated: {existing_keywords_list}
     
     For {difficulty.upper()} difficulty keywords:
     - Word count: EXACTLY 1-2 words only - this is absolutely mandatory
@@ -395,7 +457,7 @@ def generate_content_clusters(topic, difficulty):
     
     Please verify each keyword against these criteria. Include specific SEO metrics for each keyword and explain exactly why it meets {difficulty.upper()} difficulty standards.
     
-    REMEMBER: I need EXACTLY 20 keywords, no more, no less, ALL EXACTLY 1-2 WORDS MAX.
+    REMEMBER: I need EXACTLY 20 keywords, no more, no less, ALL EXACTLY 1-2 WORDS MAX, and COMPLETELY DIFFERENT from already existing keywords.
     """
     
     # Call the LLM
@@ -470,58 +532,114 @@ if submit_button:
     if not topic:
         st.error("Please enter a main topic of interest.")
     else:
-        with st.spinner(f"✨ Generating {difficulty.lower()} difficulty content clusters... This may take a minute."):
-            try:
-                df = generate_content_clusters(topic, difficulty)
-                if df is not None:
+        # Check if we're generating for a new topic
+        if st.session_state.last_topic != topic:
+            # Reset all stored keywords
+            st.session_state.all_keywords = set()
+            
+            with st.spinner(f"✨ Generating content clusters for all difficulty levels... This may take a minute or two."):
+                try:
+                    # Generate clusters for all difficulties at once
+                    all_clusters, all_keywords = generate_all_content_clusters(topic)
+                    
+                    # Store the results in session state
+                    st.session_state.generated_clusters = all_clusters
+                    st.session_state.all_keywords = all_keywords
+                    st.session_state.last_topic = topic
+                    
                     # Success message
                     st.markdown(f"""
                     <div class="success-message">
                         <h3>✅ Success!</h3>
-                        <p>Generated {len(df)} content clusters for <strong>"{topic}"</strong> with <strong>{difficulty}</strong> difficulty!</p>
+                        <p>Generated content clusters for <strong>"{topic}"</strong> at all difficulty levels!</p>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Add a difficulty badge column
-                    if 'difficulty_level' not in df.columns:
-                        df['difficulty_level'] = difficulty
+                    # Add info message about tab navigation
+                    st.markdown(f"""
+                    <div class="info-card">
+                        <h4>👀 View Your Results</h4>
+                        <p>Use the difficulty tabs below to see content clusters for each difficulty level.</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    # Display the results in a nice table
-                    st.subheader("Your Content Clusters")
-                    st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
-                    with st.container():
-                        st.markdown('<div class="table-container">', unsafe_allow_html=True)
-                        st.dataframe(
-                            df,
-                            column_config={
-                                "number": st.column_config.NumberColumn("No.", width="small"),
-                                "keyword": st.column_config.TextColumn("Keyword", width="medium"),
-                                "difficulty_level": st.column_config.TextColumn("Difficulty", width="small"),
-                                "search_volume": st.column_config.TextColumn("Search Volume", width="medium"),
-                                "competition_level": st.column_config.TextColumn("Competition", width="medium"),
-                                "explanation": st.column_config.TextColumn("Explanation", width="large"),
-                                "article_idea_1": st.column_config.TextColumn("Article Idea 1", width="large"),
-                                "article_idea_2": st.column_config.TextColumn("Article Idea 2", width="large")
-                            },
-                            use_container_width=True,
-                            height=400,
-                            hide_index=True
-                        )
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Download button
-                    csv = df.to_csv(index=False)
-                    col1, col2, col3 = st.columns([1,2,1])
-                    with col2:
-                        st.download_button(
-                            label="📥 Download Content Clusters as CSV",
-                            data=csv,
-                            file_name=f"{topic.replace(' ', '_')}_{difficulty.lower()}_difficulty_content_clusters.csv",
-                            mime="text/csv",
-                            use_container_width=True,
-                        )
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
+                except Exception as e:
+                    st.error(f"An error occurred: {str(e)}")
+        else:
+            # Topic is the same, just show stored results
+            st.markdown(f"""
+            <div class="success-message">
+                <h3>✅ Results for "{topic}"</h3>
+                <p>Showing previously generated content clusters across all difficulty levels.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+# Display difficulty tabs if we have results
+if st.session_state.generated_clusters['Low'] is not None or st.session_state.generated_clusters['Medium'] is not None or st.session_state.generated_clusters['High'] is not None:
+    # Create difficulty tabs
+    col1, col2, col3 = st.columns(3)
+    
+    # Create custom tabs with active styling
+    difficulty_options = ["Low", "Medium", "High"]
+    
+    # Initialize current difficulty if not in session state
+    if 'current_difficulty' not in st.session_state:
+        st.session_state.current_difficulty = "Low"
+    
+    # Render the tabs with custom HTML
+    st.markdown('<div class="difficulty-tabs">', unsafe_allow_html=True)
+    for difficulty in difficulty_options:
+        if difficulty == "Low":
+            active_class = "active-low" if st.session_state.current_difficulty == difficulty else ""
+        elif difficulty == "Medium":
+            active_class = "active-medium" if st.session_state.current_difficulty == difficulty else ""
+        else:  # High
+            active_class = "active-high" if st.session_state.current_difficulty == difficulty else ""
+            
+        if st.button(f"{difficulty} Difficulty", key=f"tab_{difficulty}", use_container_width=True):
+            st.session_state.current_difficulty = difficulty
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Display the current difficulty's data
+    current_difficulty = st.session_state.current_difficulty
+    df = st.session_state.generated_clusters[current_difficulty]
+    
+    if df is not None:
+        # Display the results in a nice table
+        st.subheader(f"{current_difficulty} Difficulty Content Clusters")
+        st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
+        with st.container():
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            st.dataframe(
+                df,
+                column_config={
+                    "number": st.column_config.NumberColumn("No.", width="small"),
+                    "keyword": st.column_config.TextColumn("Keyword", width="medium"),
+                    "difficulty_level": st.column_config.TextColumn("Difficulty", width="small"),
+                    "search_volume": st.column_config.TextColumn("Search Volume", width="medium"),
+                    "competition_level": st.column_config.TextColumn("Competition", width="medium"),
+                    "explanation": st.column_config.TextColumn("Explanation", width="large"),
+                    "article_idea_1": st.column_config.TextColumn("Article Idea 1", width="large"),
+                    "article_idea_2": st.column_config.TextColumn("Article Idea 2", width="large")
+                },
+                use_container_width=True,
+                height=400,
+                hide_index=True
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Download button for current difficulty
+        csv = df.to_csv(index=False)
+        col1, col2, col3 = st.columns([1,2,1])
+        with col2:
+            st.download_button(
+                label=f"📥 Download {current_difficulty} Difficulty Clusters as CSV",
+                data=csv,
+                file_name=f"{st.session_state.last_topic.replace(' ', '_')}_{current_difficulty.lower()}_difficulty_content_clusters.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
 
 # Footer
 st.markdown("<footer>", unsafe_allow_html=True)
