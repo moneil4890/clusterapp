@@ -266,14 +266,14 @@ with st.form("cluster_form"):
     submit_button = st.form_submit_button("✨ Generate Content Clusters")
 st.markdown('</div>', unsafe_allow_html=True)
 
-    # Function to get difficulty-specific parameters
+# Function to get difficulty-specific parameters
 def get_difficulty_parameters(difficulty):
     if difficulty == "Low":
         return {
-            "description": "more specific, short keywords with minimal competition that are easier to rank for",
+            "description": "more specific, niche keywords with minimal competition that are easier to rank for",
             "search_volume": "lower search volume (typically 10-300 monthly searches)",
-            "complexity": "EXACTLY 1-2 words, specific phrase combinations",
-            "examples": "\"blogging\", \"youtube tips\" (exactly 1-2 words maximum)",
+            "complexity": "1-2 words, specific phrase combinations",
+            "examples": "\"organic fertilizers\", \"companion planting\" (1-2 words)",
             "competition": "low competition score (0-30%), few established websites ranking for these terms",
             "kd_score": "KD (Keyword Difficulty) score below 30",
             "serp_features": "fewer SERP features, less established content",
@@ -283,8 +283,8 @@ def get_difficulty_parameters(difficulty):
         return {
             "description": "moderately competitive terms with decent traffic potential but still attainable",
             "search_volume": "moderate search volume (typically 300-1,000 monthly searches)",
-            "complexity": "EXACTLY 1-2 words, focused industry-specific phrases",
-            "examples": "\"SEO\", \"content marketing\" (exactly 1-2 words maximum)",
+            "complexity": "1-2 words, focused industry-specific phrases",
+            "examples": "\"vegetable gardening\", \"soil amendments\" (1-2 words)",
             "competition": "medium competition score (30-60%), some established websites but ranking opportunities exist",
             "kd_score": "KD (Keyword Difficulty) score between 30-60",
             "serp_features": "some SERP features, moderate content quality needed",
@@ -294,8 +294,8 @@ def get_difficulty_parameters(difficulty):
         return {
             "description": "highly competitive keywords with strong traffic potential but difficult to rank for",
             "search_volume": "high search volume (typically 1,000+ monthly searches)",
-            "complexity": "EXACTLY 1-2 words, broader industry terms",
-            "examples": "\"marketing\", \"social media\" (exactly 1-2 words maximum)",
+            "complexity": "1-2 words, broader industry terms",
+            "examples": "\"gardening\", \"plant care\" (1-2 words)",
             "competition": "high competition score (60%+), many established websites with high authority",
             "kd_score": "KD (Keyword Difficulty) score above 60",
             "serp_features": "many SERP features, highly optimized content required",
@@ -310,18 +310,17 @@ def generate_content_clusters(topic, difficulty):
     # Get difficulty-specific parameters
     difficulty_params = get_difficulty_parameters(difficulty)
     
-    # Create the system prompt with more specific difficulty differentiation and emphasis on EXACTLY 20 keywords
+    # Create the system prompt with more specific difficulty differentiation
     system_prompt = f"""
     Role: You are an experienced SEO specialist and content strategist with expertise in keyword difficulty analysis.
-    Task: Generate EXACTLY 20 content clusters for the topic "{topic}" with strictly "{difficulty}" difficulty level and NO overlap with other difficulty levels.
+    Task: Generate EXACTLY 20 content clusters for the topic "{topic}" with strictly "{difficulty}" difficulty level.
 
     CRITICAL: 
     - You MUST output EXACTLY 20 keywords, no more and no less.
-    - ALL KEYWORDS MUST CONTAIN EXACTLY 1-2 WORDS ONLY. This is the most important requirement. Keywords like "youtube tips" (2 words) are acceptable, but "youtube video ideas" (3 words) are NOT acceptable.
-    - The topic "{topic}" counts as ONE word. For example, if the topic is "YouTube" and you generate "YouTube monetization", that's exactly 2 words and acceptable.
-    - Do not include any conjunctions, prepositions, or articles (like "for", "with", "and", "the", "of", etc.) in your keywords.
+    - EACH KEYWORD MUST BE EITHER 1 OR 2 WORDS LONG. Both 1-word and 2-word keywords are acceptable.
+    - The keywords should include a mix of both 1-word and 2-word combinations.
     - Each keyword MUST be STRICTLY within the "{difficulty}" difficulty category as defined below.
-    - Keywords for each difficulty level must be distinct from keywords that would be appropriate for other difficulty levels.
+    - Keywords must be distinctive from keywords that would be appropriate for other difficulty levels.
 
     ---------------------------------------
     DETAILED SEO KEYWORD DIFFICULTY CRITERIA
@@ -339,7 +338,7 @@ def generate_content_clusters(topic, difficulty):
 
     Process:
     1. Generate EXACTLY 20 content cluster keywords for "{topic}" that are STRICTLY {difficulty.upper()} difficulty level.
-    2. EVERY keyword MUST be exactly 1-2 words long - this is mandatory and the most important requirement.
+    2. EVERY keyword MUST be either 1 or 2 words long - this is mandatory.
     3. Double-check each keyword against ALL criteria above to ensure it truly fits the {difficulty} difficulty profile.
     4. Each keyword MUST be related to the main topic "{topic}".
     5. The keywords should be:
@@ -363,177 +362,4 @@ def generate_content_clusters(topic, difficulty):
                 "search_volume": "Estimated volume of XXX-XXX searches per month",
                 "competition_level": "XX% - {difficulty} competition",
                 "explanation": "Detailed explanation of why this is a {difficulty.lower()} difficulty keyword with specific SEO metrics",
-                "article_idea_1": "Specific title and brief description of a potential article",
-                "article_idea_2": "Specific title and brief description of another potential article"
-            }},
-            ... (18 more entries for a total of EXACTLY 20)
-        ]
-    }}
-
-    IMPORTANT FINAL CHECK: 
-    1. Count your keywords to confirm you have EXACTLY 20 entries
-    2. Verify EVERY keyword is EXACTLY 1-2 words only - COUNT THEM CAREFULLY
-    3. Any keyword with 3 or more words MUST be removed and replaced
-    4. Review your final list and REMOVE any keywords that could be classified in different difficulty categories
-    5. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
-    
-    WORD COUNT EXAMPLES:
-    - "YouTube" = 1 word
-    - "YouTube monetization" = 2 words
-    - "YouTube video ideas" = 3 words (TOO MANY WORDS - NOT ALLOWED)
-    - "YouTube SEO" = 2 words
-    - "YouTube for beginners" = 3 words (TOO MANY WORDS - NOT ALLOWED)
-    """
-    
-    # Create the user message
-    user_prompt = f"""
-    Generate EXACTLY 20 content cluster keywords for the topic: {topic}. 
-    
-    CRITICAL REQUIREMENTS:
-    1. ALL keywords MUST contain EXACTLY 1-2 WORDS ONLY - NEVER more than 2 words - NO EXCEPTIONS!
-       Example of acceptable keywords:
-       - "{topic}" (1 word)
-       - "{topic} tips" (2 words) 
-       - "{topic} monetization" (2 words)
-       
-       Example of UNACCEPTABLE keywords (because they have more than 2 words):
-       - "{topic} video ideas" (3 words)
-       - "{topic} channel growth tips" (4 words)
-       - "best {topic} software" (3 words)
-       
-    2. Do not include prepositions, conjunctions, or articles (for, with, and, the, of, etc.)
-    3. I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics
-    4. These keywords must be distinctly different from what would be found in other difficulty levels
-    
-    For {difficulty.upper()} difficulty keywords:
-    - Word count: EXACTLY 1-2 words only - this is absolutely mandatory
-    - Search volume: {difficulty_params["search_volume"]}
-    - Competition: {difficulty_params["competition"]} 
-    - KD score: {difficulty_params["kd_score"]}
-    
-    Please verify each keyword against these criteria. Include specific SEO metrics for each keyword and explain exactly why it meets {difficulty.upper()} difficulty standards.
-    
-    REMEMBER: I need EXACTLY 20 keywords, no more, no less, ALL EXACTLY 1-2 WORDS MAX.
-    """
-    
-    # Call the LLM
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt)
-    ]
-    
-    response = llm.invoke(messages)
-    
-    # Parse the JSON response with improved handling
-    try:
-        # Look for JSON content within the response
-        response_text = response.content
-        json_start = response_text.find('{')
-        json_end = response_text.rfind('}') + 1
-        if json_start >= 0 and json_end > json_start:
-            json_str = response_text[json_start:json_end]
-            result = json.loads(json_str)
-        else:
-            # Fallback if no JSON found
-            st.error("The API response didn't contain properly formatted JSON data.")
-            return None
-    except json.JSONDecodeError:
-        st.error("Could not parse the API response as JSON.")
-        return None
-    
-    # Convert to DataFrame with exact count enforcement
-    if 'keywords' in result:
-        df = pd.DataFrame(result['keywords'])
-        
-        # ENSURE EXACTLY 20 KEYWORDS
-        if len(df) > 20:
-           df = df.iloc[:20]  # Take only the first 20
-        elif len(df) < 20:
-           # Silently handle the case when fewer than 20 keywords are returned
-           pass
-        
-        # Validate keyword length - ensure only 1-2 words
-        valid_keywords = []
-        for i, row in df.iterrows():
-            keyword = row['keyword'].strip()
-            word_count = len(keyword.split())
-            if word_count <= 2:
-                valid_keywords.append(row)
-        
-        # If we have valid keywords, replace the DataFrame
-        if valid_keywords:
-            df = pd.DataFrame(valid_keywords)
-            # If we have fewer than 20 valid keywords, that's okay
-        
-        # Add a numbered index starting from 1 instead of 0
-        df.index = df.index + 1
-        
-        # Reset index to create a column with numbering starting from 1
-        df = df.reset_index().rename(columns={"index": "number"})
-        
-        return df
-    return None
-
-# Process form submission
-if submit_button:
-    if not topic:
-        st.error("Please enter a main topic of interest.")
-    else:
-        with st.spinner(f"✨ Generating {difficulty.lower()} difficulty content clusters... This may take a minute."):
-            try:
-                df = generate_content_clusters(topic, difficulty)
-                if df is not None:
-                    # Success message
-                    st.markdown(f"""
-                    <div class="success-message">
-                        <h3>✅ Success!</h3>
-                        <p>Generated {len(df)} content clusters for <strong>"{topic}"</strong> with <strong>{difficulty}</strong> difficulty!</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Add a difficulty badge column
-                    if 'difficulty_level' not in df.columns:
-                        df['difficulty_level'] = difficulty
-                    
-                    # Display the results in a nice table
-                    st.subheader("Your Content Clusters")
-                    st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
-                    with st.container():
-                        st.markdown('<div class="table-container">', unsafe_allow_html=True)
-                        st.dataframe(
-                            df,
-                            column_config={
-                                "number": st.column_config.NumberColumn("No.", width="small"),
-                                "keyword": st.column_config.TextColumn("Keyword", width="medium"),
-                                "difficulty_level": st.column_config.TextColumn("Difficulty", width="small"),
-                                "search_volume": st.column_config.TextColumn("Search Volume", width="medium"),
-                                "competition_level": st.column_config.TextColumn("Competition", width="medium"),
-                                "explanation": st.column_config.TextColumn("Explanation", width="large"),
-                                "article_idea_1": st.column_config.TextColumn("Article Idea 1", width="large"),
-                                "article_idea_2": st.column_config.TextColumn("Article Idea 2", width="large")
-                            },
-                            use_container_width=True,
-                            height=400,
-                            hide_index=True
-                        )
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Download button
-                    csv = df.to_csv(index=False)
-                    col1, col2, col3 = st.columns([1,2,1])
-                    with col2:
-                        st.download_button(
-                            label="📥 Download Content Clusters as CSV",
-                            data=csv,
-                            file_name=f"{topic.replace(' ', '_')}_{difficulty.lower()}_difficulty_content_clusters.csv",
-                            mime="text/csv",
-                            use_container_width=True,
-                        )
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-
-# Footer
-st.markdown("<footer>", unsafe_allow_html=True)
-st.markdown("---")
-st.markdown("© 2025 Content Cluster Generator | Built with Streamlit and LangChain")
-st.markdown("</footer>", unsafe_allow_html=True)
+                "article_idea_1": "Specific title and brief description of
