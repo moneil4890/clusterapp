@@ -362,4 +362,169 @@ def generate_content_clusters(topic, difficulty):
                 "search_volume": "Estimated volume of XXX-XXX searches per month",
                 "competition_level": "XX% - {difficulty} competition",
                 "explanation": "Detailed explanation of why this is a {difficulty.lower()} difficulty keyword with specific SEO metrics",
-                "article_idea_1": "Specific title and brief description of
+                "article_idea_1": "Specific title and brief description of a potential article",
+                "article_idea_2": "Specific title and brief description of a potential article"
+            }},
+            ... (18 more entries for a total of EXACTLY 20)
+        ]
+    }}
+
+    IMPORTANT FINAL CHECK: 
+    1. Count your keywords to confirm you have EXACTLY 20 entries
+    2. Verify EVERY keyword is EXACTLY 1-2 words only - COUNT THEM CAREFULLY
+    3. Any keyword with 3 or more words MUST be removed and replaced
+    4. Review your final list and REMOVE any keywords that could be classified in different difficulty categories
+    5. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
+    """
+    
+    # Create the user message
+    user_prompt = f"""
+    Generate EXACTLY 20 content cluster keywords for the topic: {topic}. 
+    
+    CRITICAL REQUIREMENTS:
+    1. ALL keywords MUST contain EXACTLY 1-2 WORDS ONLY - NEVER more than 2 words - NO EXCEPTIONS!
+    2. Include a mix of both single-word keywords and two-word keywords.
+    3. I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics
+    4. These keywords must be distinctly different from what would be found in other difficulty levels
+    
+    For {difficulty.upper()} difficulty keywords:
+    - Word count: EXACTLY 1-2 words only - this is absolutely mandatory
+    - Search volume: {difficulty_params["search_volume"]}
+    - Competition: {difficulty_params["competition"]} 
+    - KD score: {difficulty_params["kd_score"]}
+    
+    Please verify each keyword against these criteria. Include specific SEO metrics for each keyword and explain exactly why it meets {difficulty.upper()} difficulty standards.
+    
+    REMEMBER: I need EXACTLY 20 keywords, no more, no less, ALL EXACTLY 1-2 WORDS MAX.
+    """
+    
+    # Call the LLM
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_prompt)
+    ]
+    
+    response = llm.invoke(messages)
+    
+    # Parse the JSON response with improved handling
+    try:
+        # Look for JSON content within the response
+        response_text = response.content
+        json_start = response_text.find('{')
+        json_end = response_text.rfind('}') + 1
+        if json_start >= 0 and json_end > json_start:
+            json_str = response_text[json_start:json_end]
+            result = json.loads(json_str)
+        else:
+            # Fallback if no JSON found
+            st.error("The API response didn't contain properly formatted JSON data.")
+            return None
+    except json.JSONDecodeError:
+        st.error("Could not parse the API response as JSON.")
+        return None
+    
+    # Convert to DataFrame with exact count enforcement
+    if 'keywords' in result:
+        df = pd.DataFrame(result['keywords'])
+        
+        # ENSURE EXACTLY 20 KEYWORDS
+        if len(df) > 20:
+           df = df.iloc[:20]  # Take only the first 20
+        elif len(df) < 20:
+           # Silently handle the case when fewer than 20 keywords are returned
+           pass
+        
+        # Validate keyword length - ensure only 1-2 words
+        valid_keywords = []
+        for i, row in df.iterrows():
+            keyword = row['keyword'].strip()
+            word_count = len(keyword.split())
+            if word_count <= 2:
+                valid_keywords.append(row)
+            else:
+                # For keywords with more than 2 words, try to extract a 1-2 word version
+                words = keyword.split()
+                if len(words) > 2:
+                    # Take just the first 2 words
+                    keyword_fixed = " ".join(words[:2])
+                    row_copy = row.copy()
+                    row_copy['keyword'] = keyword_fixed
+                    valid_keywords.append(row_copy)
+        
+        # If we have valid keywords, replace the DataFrame
+        if valid_keywords:
+            df = pd.DataFrame(valid_keywords)
+            # If we have fewer than 20 valid keywords, that's okay
+        
+        # Add a numbered index starting from 1 instead of 0
+        df.index = df.index + 1
+        
+        # Reset index to create a column with numbering starting from 1
+        df = df.reset_index().rename(columns={"index": "number"})
+        
+        return df
+    return None
+
+# Process form submission
+if submit_button:
+    if not topic:
+        st.error("Please enter a main topic of interest.")
+    else:
+        with st.spinner(f"✨ Generating {difficulty.lower()} difficulty content clusters... This may take a minute."):
+            try:
+                df = generate_content_clusters(topic, difficulty)
+                if df is not None:
+                    # Success message
+                    st.markdown(f"""
+                    <div class="success-message">
+                        <h3>✅ Success!</h3>
+                        <p>Generated {len(df)} content clusters for <strong>"{topic}"</strong> with <strong>{difficulty}</strong> difficulty!</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Add a difficulty badge column
+                    if 'difficulty_level' not in df.columns:
+                        df['difficulty_level'] = difficulty
+                    
+                    # Display the results in a nice table
+                    st.subheader("Your Content Clusters")
+                    st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
+                    with st.container():
+                        st.markdown('<div class="table-container">', unsafe_allow_html=True)
+                        st.dataframe(
+                            df,
+                            column_config={
+                                "number": st.column_config.NumberColumn("No.", width="small"),
+                                "keyword": st.column_config.TextColumn("Keyword", width="medium"),
+                                "difficulty_level": st.column_config.TextColumn("Difficulty", width="small"),
+                                "search_volume": st.column_config.TextColumn("Search Volume", width="medium"),
+                                "competition_level": st.column_config.TextColumn("Competition", width="medium"),
+                                "explanation": st.column_config.TextColumn("Explanation", width="large"),
+                                "article_idea_1": st.column_config.TextColumn("Article Idea 1", width="large"),
+                                "article_idea_2": st.column_config.TextColumn("Article Idea 2", width="large")
+                            },
+                            use_container_width=True,
+                            height=400,
+                            hide_index=True
+                        )
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # Download button
+                    csv = df.to_csv(index=False)
+                    col1, col2, col3 = st.columns([1,2,1])
+                    with col2:
+                        st.download_button(
+                            label="📥 Download Content Clusters as CSV",
+                            data=csv,
+                            file_name=f"{topic.replace(' ', '_')}_{difficulty.lower()}_difficulty_content_clusters.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                        )
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+
+# Footer
+st.markdown("<footer>", unsafe_allow_html=True)
+st.markdown("---")
+st.markdown("© 2025 Content Cluster Generator | Built with Streamlit and LangChain")
+st.markdown("</footer>", unsafe_allow_html=True)
