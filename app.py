@@ -266,14 +266,14 @@ with st.form("cluster_form"):
     submit_button = st.form_submit_button("✨ Generate Content Clusters")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Function to get difficulty-specific parameters
+    # Function to get difficulty-specific parameters
 def get_difficulty_parameters(difficulty):
     if difficulty == "Low":
         return {
             "description": "more specific, short keywords with minimal competition that are easier to rank for",
             "search_volume": "lower search volume (typically 10-300 monthly searches)",
-            "complexity": "1-2 words, specific phrase combinations",
-            "examples": "specific industry terms, niche phrases with limited competition",
+            "complexity": "EXACTLY 1-2 words, specific phrase combinations",
+            "examples": "\"blogging\", \"youtube tips\" (exactly 1-2 words maximum)",
             "competition": "low competition score (0-30%), few established websites ranking for these terms",
             "kd_score": "KD (Keyword Difficulty) score below 30",
             "serp_features": "fewer SERP features, less established content",
@@ -283,8 +283,8 @@ def get_difficulty_parameters(difficulty):
         return {
             "description": "moderately competitive terms with decent traffic potential but still attainable",
             "search_volume": "moderate search volume (typically 300-1,000 monthly searches)",
-            "complexity": "1-2 words, focused industry-specific phrases",
-            "examples": "industry terms, product types, solutions with moderate competition",
+            "complexity": "EXACTLY 1-2 words, focused industry-specific phrases",
+            "examples": "\"SEO\", \"content marketing\" (exactly 1-2 words maximum)",
             "competition": "medium competition score (30-60%), some established websites but ranking opportunities exist",
             "kd_score": "KD (Keyword Difficulty) score between 30-60",
             "serp_features": "some SERP features, moderate content quality needed",
@@ -294,8 +294,8 @@ def get_difficulty_parameters(difficulty):
         return {
             "description": "highly competitive keywords with strong traffic potential but difficult to rank for",
             "search_volume": "high search volume (typically 1,000+ monthly searches)",
-            "complexity": "1-2 words, broader industry terms",
-            "examples": "major topic terms, popular products or services",
+            "complexity": "EXACTLY 1-2 words, broader industry terms",
+            "examples": "\"marketing\", \"social media\" (exactly 1-2 words maximum)",
             "competition": "high competition score (60%+), many established websites with high authority",
             "kd_score": "KD (Keyword Difficulty) score above 60",
             "serp_features": "many SERP features, highly optimized content required",
@@ -317,7 +317,9 @@ def generate_content_clusters(topic, difficulty):
 
     CRITICAL: 
     - You MUST output EXACTLY 20 keywords, no more and no less.
-    - ALL keywords MUST be exactly 1-2 words only, regardless of difficulty level.
+    - ALL KEYWORDS MUST CONTAIN EXACTLY 1-2 WORDS ONLY. This is the most important requirement. Keywords like "youtube tips" (2 words) are acceptable, but "youtube video ideas" (3 words) are NOT acceptable.
+    - The topic "{topic}" counts as ONE word. For example, if the topic is "YouTube" and you generate "YouTube monetization", that's exactly 2 words and acceptable.
+    - Do not include any conjunctions, prepositions, or articles (like "for", "with", "and", "the", "of", etc.) in your keywords.
     - Each keyword MUST be STRICTLY within the "{difficulty}" difficulty category as defined below.
     - Keywords for each difficulty level must be distinct from keywords that would be appropriate for other difficulty levels.
 
@@ -328,7 +330,7 @@ def generate_content_clusters(topic, difficulty):
     FOR {difficulty.upper()} DIFFICULTY KEYWORDS:
     - Description: {difficulty_params["description"]}
     - Search Volume: {difficulty_params["search_volume"]}
-    - Word Count/Format: {difficulty_params["complexity"]} (MUST BE ONLY 1-2 WORDS)
+    - Word Count/Format: {difficulty_params["complexity"]} (MUST BE EXACTLY 1-2 WORDS - NO EXCEPTIONS)
     - Competition Level: {difficulty_params["competition"]}
     - Keyword Difficulty Score: {difficulty_params["kd_score"]}
     - SERP Features: {difficulty_params["serp_features"]}
@@ -337,7 +339,7 @@ def generate_content_clusters(topic, difficulty):
 
     Process:
     1. Generate EXACTLY 20 content cluster keywords for "{topic}" that are STRICTLY {difficulty.upper()} difficulty level.
-    2. EVERY keyword MUST be exactly 1-2 words long - this is mandatory.
+    2. EVERY keyword MUST be exactly 1-2 words long - this is mandatory and the most important requirement.
     3. Double-check each keyword against ALL criteria above to ensure it truly fits the {difficulty} difficulty profile.
     4. Each keyword MUST be related to the main topic "{topic}".
     5. The keywords should be:
@@ -370,9 +372,17 @@ def generate_content_clusters(topic, difficulty):
 
     IMPORTANT FINAL CHECK: 
     1. Count your keywords to confirm you have EXACTLY 20 entries
-    2. Verify EVERY keyword is exactly 1-2 words only
-    3. Review your final list and REMOVE any keywords that could be classified in different difficulty categories
-    4. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
+    2. Verify EVERY keyword is EXACTLY 1-2 words only - COUNT THEM CAREFULLY
+    3. Any keyword with 3 or more words MUST be removed and replaced
+    4. Review your final list and REMOVE any keywords that could be classified in different difficulty categories
+    5. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
+    
+    WORD COUNT EXAMPLES:
+    - "YouTube" = 1 word
+    - "YouTube monetization" = 2 words
+    - "YouTube video ideas" = 3 words (TOO MANY WORDS - NOT ALLOWED)
+    - "YouTube SEO" = 2 words
+    - "YouTube for beginners" = 3 words (TOO MANY WORDS - NOT ALLOWED)
     """
     
     # Create the user message
@@ -380,19 +390,30 @@ def generate_content_clusters(topic, difficulty):
     Generate EXACTLY 20 content cluster keywords for the topic: {topic}. 
     
     CRITICAL REQUIREMENTS:
-    1. ALL keywords MUST be exactly 1-2 words long - no exceptions
-    2. I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics
-    3. These keywords must be distinctly different from what would be found in other difficulty levels
+    1. ALL keywords MUST contain EXACTLY 1-2 WORDS ONLY - NEVER more than 2 words - NO EXCEPTIONS!
+       Example of acceptable keywords:
+       - "{topic}" (1 word)
+       - "{topic} tips" (2 words) 
+       - "{topic} monetization" (2 words)
+       
+       Example of UNACCEPTABLE keywords (because they have more than 2 words):
+       - "{topic} video ideas" (3 words)
+       - "{topic} channel growth tips" (4 words)
+       - "best {topic} software" (3 words)
+       
+    2. Do not include prepositions, conjunctions, or articles (for, with, and, the, of, etc.)
+    3. I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics
+    4. These keywords must be distinctly different from what would be found in other difficulty levels
     
     For {difficulty.upper()} difficulty keywords:
-    - Word count: EXACTLY 1-2 words only
+    - Word count: EXACTLY 1-2 words only - this is absolutely mandatory
     - Search volume: {difficulty_params["search_volume"]}
     - Competition: {difficulty_params["competition"]} 
     - KD score: {difficulty_params["kd_score"]}
     
     Please verify each keyword against these criteria. Include specific SEO metrics for each keyword and explain exactly why it meets {difficulty.upper()} difficulty standards.
     
-    REMEMBER: I need EXACTLY 20 keywords, no more, no less, all exactly 1-2 words.
+    REMEMBER: I need EXACTLY 20 keywords, no more, no less, ALL EXACTLY 1-2 WORDS MAX.
     """
     
     # Call the LLM
@@ -430,7 +451,20 @@ def generate_content_clusters(topic, difficulty):
         elif len(df) < 20:
            # Silently handle the case when fewer than 20 keywords are returned
            pass
-           
+        
+        # Validate keyword length - ensure only 1-2 words
+        valid_keywords = []
+        for i, row in df.iterrows():
+            keyword = row['keyword'].strip()
+            word_count = len(keyword.split())
+            if word_count <= 2:
+                valid_keywords.append(row)
+        
+        # If we have valid keywords, replace the DataFrame
+        if valid_keywords:
+            df = pd.DataFrame(valid_keywords)
+            # If we have fewer than 20 valid keywords, that's okay
+        
         # Add a numbered index starting from 1 instead of 0
         df.index = df.index + 1
         
