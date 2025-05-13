@@ -22,8 +22,158 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
     
-    /* Your existing CSS styles here */
-    /* ... */
+    html, body, [class*="css"] {
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    .main {
+        padding-top: 1rem;
+        background-color: #F9FAFB;
+    }
+    
+    .stApp {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    h1 {
+        color: #4F46E5;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+    }
+    
+    h2, h3 {
+        color: #4338CA;
+        font-weight: 600;
+    }
+    
+    .stButton > button {
+        background-color: #4F46E5;
+        color: white;
+        border-radius: 8px;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        background-color: #4338CA;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+    }
+    
+    .css-1v3fvcr {
+        background-color: #F9FAFB;
+    }
+    
+    .table-container {
+        background-color: white;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        margin-top: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .download-btn {
+        background-color: #10B981;
+        color: white;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .download-btn:hover {
+        background-color: #059669;
+    }
+    
+    .sidebar .css-1d391kg {
+        background-color: #F3F4F6;
+    }
+    
+    .hero-section {
+        background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+        padding: 2rem;
+        border-radius: 12px;
+        color: white;
+        margin-bottom: 2rem;
+    }
+    
+    .hero-section h1 {
+        color: white;
+        margin-bottom: 1rem;
+    }
+    
+    .hero-section p {
+        opacity: 0.9;
+        font-size: 1.1rem;
+        margin-bottom: 0;
+    }
+    
+    .form-container {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+    
+    .success-message {
+        background-color: #ECFDF5;
+        border-left: 5px solid #10B981;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stDataFrame {
+        border: none !important;
+    }
+    
+    .stDataFrame [data-testid="stDataFrameResizable"] {
+        border: none !important;
+    }
+    
+    footer {
+        text-align: center;
+        padding: 1.5rem 0;
+        color: #6B7280;
+    }
+    
+    /* Custom divider */
+    .custom-divider {
+        height: 4px;
+        background: linear-gradient(90deg, #4F46E5, #7C3AED);
+        border-radius: 2px;
+        margin: 0.5rem 0 1.5rem 0;
+        width: 100px;
+    }
+    
+    /* Difficulty badge styles */
+    .difficulty-badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+        margin-left: 10px;
+    }
+    .low-difficulty {
+        background-color: #D1FAE5;
+        color: #065F46;
+    }
+    .medium-difficulty {
+        background-color: #FEF3C7;
+        color: #92400E;
+    }
+    .high-difficulty {
+        background-color: #FEE2E2;
+        color: #991B1B;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -40,10 +190,54 @@ Build a comprehensive SEO strategy that demonstrates expertise to search engines
 """)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Sidebar content (unchanged)
+# Sidebar content
 with st.sidebar:
-    # Your existing sidebar code here
-    # ...
+    st.image("https://img.icons8.com/fluency/96/000000/content.png", width=80)
+    st.header("About This Tool")
+    st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
+    st.markdown("""
+    #### What are Content Clusters?
+    
+    Content clusters are groups of related content pieces that establish you as an authority on a specific topic in the eyes of search engines.
+    
+    #### How to use this app:
+    
+    1. Enter your main topic of interest
+    2. Select the keyword difficulty level
+    3. Click "Generate Content Clusters"
+    4. Download your results as CSV
+    
+    #### Difficulty Levels (Updated):
+    
+    - **Low**: 
+      - 1-2 words to longer phrases
+      - 10-300 monthly searches
+      - KD score below 30
+      - Minimal competition
+    
+    - **Medium**: 
+      - 1-2 words to mid-length phrases
+      - 300-1,000 monthly searches
+      - KD score 30-60
+      - Moderate competition
+    
+    - **High**: 
+      - 1-2 words to broader terms
+      - 1,000+ monthly searches
+      - KD score above 60
+      - Strong competition, major sites
+    
+    #### Benefits:
+    
+    - Improve search engine rankings
+    - Build topical authority
+    - Create strategic content plans
+    - Save time on keyword research
+    """)
+    
+    st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
+    st.markdown("### Made with:")
+    st.markdown("- 💻 Streamlit\n- 🤖 LangChain\n- 🧠 OpenAI GPT-3.5")
 
 # Main form in a container
 st.markdown('<div class="form-container">', unsafe_allow_html=True)
