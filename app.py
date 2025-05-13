@@ -203,22 +203,22 @@ with st.sidebar:
     3. Click "Generate Content Clusters"
     4. Download your results as CSV
     
-    #### Difficulty Levels (SEO Standard):
+    #### Difficulty Levels (Updated):
     
     - **Low**: 
-      - 4+ words, specific phrases
+      - 1-2 words to longer phrases
       - 10-300 monthly searches
       - KD score below 30
       - Minimal competition
     
     - **Medium**: 
-      - 3-4 words, focused phrases
+      - 1-2 words to mid-length phrases
       - 300-1,000 monthly searches
       - KD score 30-60
       - Moderate competition
     
     - **High**: 
-      - 1-2 words, broader terms
+      - 1-2 words to broader terms
       - 1,000+ monthly searches
       - KD score above 60
       - Strong competition, major sites
@@ -266,14 +266,14 @@ with st.form("cluster_form"):
     submit_button = st.form_submit_button("✨ Generate Content Clusters")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Function to get difficulty-specific parameters
+# Function to get difficulty-specific parameters (UPDATED to allow 1-2 words for all difficulty levels)
 def get_difficulty_parameters(difficulty):
     if difficulty == "Low":
         return {
-            "description": "long-tail, specific keywords with minimal competition that are much easier to rank for",
+            "description": "keywords with minimal competition that are much easier to rank for",
             "search_volume": "lower search volume (typically 10-300 monthly searches)",
-            "complexity": "highly specific, longer phrases (typically 4+ words)",
-            "examples": "very specific how-to guides, niche questions, micro-topics with limited competition",
+            "complexity": "can range from 1-2 words to longer specific phrases",
+            "examples": "short keywords with low competition, specific how-to guides, niche questions, micro-topics",
             "competition": "low competition score (0-30%), few established websites ranking for these terms",
             "kd_score": "KD (Keyword Difficulty) score below 30",
             "serp_features": "fewer SERP features, less established content",
@@ -283,8 +283,8 @@ def get_difficulty_parameters(difficulty):
         return {
             "description": "moderately competitive terms with decent traffic potential but still attainable",
             "search_volume": "moderate search volume (typically 300-1,000 monthly searches)",
-            "complexity": "more focused mid-tail phrases (usually 3-4 words)",
-            "examples": "specific questions, comparison posts, focused topic guides with moderate competition",
+            "complexity": "can range from 1-2 words to mid-length focused phrases",
+            "examples": "moderately competitive short keywords, specific questions, comparison posts, focused topic guides",
             "competition": "medium competition score (30-60%), some established websites but ranking opportunities exist",
             "kd_score": "KD (Keyword Difficulty) score between 30-60",
             "serp_features": "some SERP features, moderate content quality needed",
@@ -294,30 +294,43 @@ def get_difficulty_parameters(difficulty):
         return {
             "description": "highly competitive keywords with strong traffic potential but difficult to rank for",
             "search_volume": "high search volume (typically 1,000+ monthly searches)",
-            "complexity": "shorter, broader terms (often 1-2 words)",
-            "examples": "major topic guides, competitive reviews, popular products or services",
+            "complexity": "can be short terms (1-2 words) or broader phrases",
+            "examples": "highly competitive short keywords, major topic guides, competitive reviews, popular products or services",
             "competition": "high competition score (60%+), many established websites with high authority",
             "kd_score": "KD (Keyword Difficulty) score above 60",
             "serp_features": "many SERP features, highly optimized content required",
             "intent": "often commercial or navigational intent with high competition"
         }
 
-# Function to generate content clusters
+# Global variable to store generated keywords across difficulty levels
+all_generated_keywords = {}
+
+# Function to generate content clusters with anti-duplication check
 def generate_content_clusters(topic, difficulty):
+    global all_generated_keywords
+    
     # Set up LangChain with OpenAI
     llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
     
     # Get difficulty-specific parameters
     difficulty_params = get_difficulty_parameters(difficulty)
     
-    # Create the system prompt with more specific difficulty differentiation and emphasis on EXACTLY 20 keywords
+    # Create a list of keywords to avoid (from other difficulty levels)
+    keywords_to_avoid = []
+    for diff, keywords in all_generated_keywords.items():
+        if diff != difficulty:
+            keywords_to_avoid.extend(keywords)
+    
+    # Create the system prompt with updated difficulty differentiation and anti-duplication
     system_prompt = f"""
     Role: You are an experienced SEO specialist and content strategist with expertise in keyword difficulty analysis.
     Task: Generate EXACTLY 20 content clusters for the topic "{topic}" with strictly "{difficulty}" difficulty level and NO overlap with other difficulty levels.
 
-    CRITICAL: 
+    CRITICAL UPDATES: 
     - You MUST output EXACTLY 20 keywords, no more and no less.
-    - The user has reported issues with keywords not properly matching their stated difficulty levels. You MUST ensure EVERY keyword you generate is STRICTLY within the "{difficulty}" difficulty category as defined below.
+    - The keywords can now be 1-2 words for ALL difficulty levels (Low, Medium, and High)
+    - You MUST ensure EVERY keyword you generate is STRICTLY within the "{difficulty}" difficulty category based on competition metrics, NOT word count alone
+    - AVOID using ANY of these exact keywords from other difficulty levels: {", ".join(keywords_to_avoid) if keywords_to_avoid else "None yet"}
 
     ---------------------------------------
     DETAILED SEO KEYWORD DIFFICULTY CRITERIA
@@ -342,6 +355,13 @@ def generate_content_clusters(topic, difficulty):
        b. Directly relevant to "{topic}"
        c. Diverse to cover different aspects of the topic
        d. Suitable for creating multiple content pieces
+       e. NOT an exact match to any keywords in the avoid list
+
+    ANTI-DUPLICATION TEST:
+    For each keyword you generate:
+    1. Check if it appears in the "keywords to avoid" list
+    2. If it does, create a different keyword that maintains the {difficulty} difficulty level
+    3. Ensure that you're not simply changing word order or making minor variations of avoided keywords
 
     FOR THE OUTPUT JSON:
     - Include specific justification for WHY each keyword matches {difficulty.upper()} difficulty criteria
@@ -368,7 +388,8 @@ def generate_content_clusters(topic, difficulty):
     IMPORTANT FINAL CHECK: 
     1. Count your keywords to confirm you have EXACTLY 20 entries
     2. Review your final list and REMOVE any keywords that could be classified in different difficulty categories. Every keyword MUST be undeniably a {difficulty.upper()} difficulty keyword.
-    3. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
+    3. Check that NONE of your keywords exactly match any in the "keywords to avoid" list
+    4. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
     """
     
     # Create the user message
@@ -376,6 +397,10 @@ def generate_content_clusters(topic, difficulty):
     Generate EXACTLY 20 content cluster keywords for the topic: {topic}. 
     
     I need STRICTLY {difficulty.upper()} difficulty level keywords according to standard SEO metrics. Previous results showed keywords that overlapped between difficulty levels.
+    
+    IMPORTANT UPDATES:
+    1. The keywords can now be 1-2 words for ALL difficulty levels, not just High difficulty
+    2. Avoid using any of these exact keywords from other difficulty levels: {", ".join(keywords_to_avoid) if keywords_to_avoid else "None yet"}
     
     For {difficulty.upper()} difficulty keywords:
     - Word count: {difficulty_params["complexity"]}
@@ -421,8 +446,12 @@ def generate_content_clusters(topic, difficulty):
         if len(df) > 20:
            df = df.iloc[:20]  # Take only the first 20
         elif len(df) < 20:
-        # Silently handle the case when fewer than 20 keywords are returned
+           # Silently handle the case when fewer than 20 keywords are returned
            pass
+        
+        # Store these keywords in our global tracker to avoid future duplicates
+        all_generated_keywords[difficulty] = df['keyword'].tolist()
+        
         # Add a numbered index starting from 1 instead of 0
         df.index = df.index + 1
         
