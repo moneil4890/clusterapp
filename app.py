@@ -270,10 +270,8 @@ with st.form("cluster_form"):
     submit_button = st.form_submit_button("✨ Generate Content Clusters")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Function to get difficulty-specific parameters (unchanged)
+# Function to get difficulty-specific parameters
 def get_difficulty_parameters(difficulty):
-    # Your existing function unchanged
-    # ...
     if difficulty == "Low":
         return {
             "description": "keywords with minimal competition that are much easier to rank for",
@@ -308,9 +306,9 @@ def get_difficulty_parameters(difficulty):
             "intent": "often commercial or navigational intent with high competition"
         }
 
-# IMPROVED Function to generate content clusters with enhanced anti-duplication
+# IMPROVED Function to generate content clusters with more appropriate keyword selection
 def generate_content_clusters(topic, difficulty):
-    # Use session state instead of global variable
+    # Use session state to track keywords
     if topic not in st.session_state.all_generated_keywords:
         st.session_state.all_generated_keywords[topic] = {}
         
@@ -320,28 +318,10 @@ def generate_content_clusters(topic, difficulty):
     # Get difficulty-specific parameters
     difficulty_params = get_difficulty_parameters(difficulty)
     
-    # Create a list of keywords to avoid (from other difficulty levels for this topic)
-    keywords_to_avoid = []
-    if topic in st.session_state.all_generated_keywords:
-        for diff, keywords in st.session_state.all_generated_keywords[topic].items():
-            if diff != difficulty:
-                keywords_to_avoid.extend(keywords)
-    
-    # Display previously generated keywords (for user transparency)
-    if keywords_to_avoid:
-        with st.sidebar.expander("Previously generated keywords (to avoid)", expanded=False):
-            st.write(", ".join(keywords_to_avoid))
-    
-    # Create the system prompt with STRICT anti-duplication enforcement
+    # Create the system prompt with improved guidance
     system_prompt = f"""
     Role: You are an experienced SEO specialist and content strategist with expertise in keyword difficulty analysis.
-    Task: Generate EXACTLY 20 completely unique content clusters for the topic "{topic}" with strictly "{difficulty}" difficulty level, ensuring ZERO overlap with previously generated keywords.
-
-    CRITICAL ANTI-DUPLICATION INSTRUCTIONS: 
-    - You MUST check EVERY generated keyword against this EXACT list of previously generated keywords: [{", ".join(keywords_to_avoid) if keywords_to_avoid else "None yet"}]
-    - If ANY keyword you generate is SIMILAR IN ANY WAY to any keyword in this list, you MUST discard it and create a completely different one
-    - Even variations of a keyword (plurals, reordering words, adding or removing stop words, etc.) are STRICTLY PROHIBITED
-    - ZERO TOLERANCE for any keyword that could be considered a duplicate or close variant
+    Task: Generate EXACTLY 20 highly relevant content clusters for the topic "{topic}" with "{difficulty}" difficulty level.
 
     ---------------------------------------
     DETAILED SEO KEYWORD DIFFICULTY CRITERIA
@@ -357,6 +337,11 @@ def generate_content_clusters(topic, difficulty):
     - User Intent: {difficulty_params["intent"]}
     - Examples: {difficulty_params["examples"]}
 
+    SPECIFIC EXAMPLES FOR "{topic}" BY DIFFICULTY:
+    - LOW: Long-tail, specific phrases with clear intent (e.g., "{topic} for side sleepers with back pain", "best budget {topic} for hot sleepers")
+    - MEDIUM: Mid-competition phrases (e.g., "best {topic} brands", "{topic} vs memory foam", "affordable {topic}")
+    - HIGH: Short, competitive terms (e.g., "{topic}", "{topic} king", "buy {topic}", "{topic} reviews")
+
     Process:
     1. Generate EXACTLY 20 content cluster keywords for "{topic}" that are STRICTLY {difficulty.upper()} difficulty level.
     2. Double-check each keyword against ALL criteria above to ensure it truly fits the {difficulty} difficulty profile.
@@ -366,26 +351,15 @@ def generate_content_clusters(topic, difficulty):
        b. Directly relevant to "{topic}"
        c. Diverse to cover different aspects of the topic
        d. Suitable for creating multiple content pieces
-       e. 100% UNIQUE compared to any keywords in the avoid list
-
-    MANDATORY ANTI-DUPLICATION PROCESS:
-    For each keyword you generate:
-    1. Check if it appears in the "keywords to avoid" list EXACTLY as written 
-    2. Check if it is a VARIATION of any keyword in the avoid list (plural forms, reordering, etc.)
-    3. Check if it CONTAINS any avoided keyword as a substring
-    4. Check if any avoided keyword CONTAINS your proposed keyword
-    5. If ANY of the above checks are TRUE, DISCARD the keyword and create a COMPLETELY NEW ONE
-    6. Focus on exploring entirely different CONCEPTS, ANGLES, and ASPECTS of the main topic
-
-    EXAMPLE AVOID PATTERN:
-    - If "organic gardening tips" is in avoid list, then you CANNOT use:
-      * "organic gardening tips" (exact match)
-      * "tips for organic gardening" (reordering)
-      * "organic gardening tip" (singular variant)
-      * "best organic gardening tips" (added modifier)
-      * "organic gardening tips for beginners" (extended phrase)
-      Instead, find a completely different aspect like "organic soil preparation"
-
+       
+    CRITICAL {difficulty.upper()} DIFFICULTY GUIDANCE:
+    
+    - For LOW difficulty: Focus on long-tail, specific phrases with clear intent but lower search volume
+    - For MEDIUM difficulty: Focus on mid-length phrases with moderate competition and search volume
+    - For HIGH difficulty: Focus on short, competitive terms with high search volume
+    
+    IMPORTANT: Your goal is to generate THE MOST REALISTIC AND ACCURATE {difficulty.upper()} difficulty keywords for "{topic}" that SEO professionals would actually target, not to artificially create unique terms.
+    
     FORMAT OUTPUT JSON:
     {{
         "keywords": [
@@ -398,37 +372,34 @@ def generate_content_clusters(topic, difficulty):
                 "article_idea_1": "Specific title and brief description of a potential article",
                 "article_idea_2": "Specific title and brief description of another potential article"
             }},
-            ... (18 more entries for a total of EXACTLY 20)
+            ... (19 more entries for a total of EXACTLY 20)
         ]
     }}
 
     FINAL VALIDATION:
     1. Count your keywords to confirm you have EXACTLY 20 entries
-    2. Review your final list and REMOVE any keywords that could be classified in different difficulty categories
-    3. TRIPLE CHECK that NONE of your keywords match or resemble ANY keywords in the "keywords to avoid" list
-    4. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
+    2. Review your final list and REMOVE any keywords that don't properly match the {difficulty} difficulty criteria
+    3. If you had to remove any keywords that didn't meet the criteria, replace them with new valid keywords to maintain EXACTLY 20 total.
     """
     
-    # Create the user message with strict anti-duplication emphasis
+    # Create the user message with proper difficulty emphasis and examples
     user_prompt = f"""
     Generate EXACTLY 20 content cluster keywords for: {topic}.
     
-    I need STRICTLY {difficulty.upper()} difficulty level keywords with ZERO duplication from previous results.
+    I need STRICTLY {difficulty.upper()} difficulty level keywords that would be most appropriate for an SEO strategy.
     
-    CRITICAL REQUIREMENT:
-    Previously, you generated keywords that were too similar across difficulty levels. This time, I need completely unique keywords that have ABSOLUTELY NO SIMILARITY to these previously generated keywords:
-
-    {", ".join(keywords_to_avoid) if keywords_to_avoid else "No keywords to avoid yet"}
-
-    ANY variation or similarity to these keywords is unacceptable. Don't just reorder words or change plurals - create COMPLETELY DIFFERENT keyword concepts.
-
     For {difficulty.upper()} difficulty keywords:
     - Word count: {difficulty_params["complexity"]}
     - Search volume: {difficulty_params["search_volume"]}
     - Competition: {difficulty_params["competition"]} 
     - KD score: {difficulty_params["kd_score"]}
     
-    Your response MUST be exactly 20 keywords, with detailed SEO metrics for each.
+    {difficulty.upper()} DIFFICULTY GUIDANCE WITH EXAMPLES:
+    - LOW: Long-tail phrases with specific intent (e.g., "best {topic} for side sleepers with back pain", "affordable {topic} for small apartments")
+    - MEDIUM: Mid-competition phrases with moderate search volume (e.g., "best {topic} brands", "{topic} vs traditional", "affordable {topic}")
+    - HIGH: Short, competitive terms with high search volume (e.g., "{topic}", "{topic} king", "buy {topic}", "{topic} reviews")
+    
+    Your response MUST be exactly 20 keywords with detailed SEO metrics for each, focusing on being realistic and accurate for the {difficulty} difficulty level.
     """
     
     # Call the LLM
@@ -467,40 +438,7 @@ def generate_content_clusters(topic, difficulty):
            # Silently handle the case when fewer than 20 keywords are returned
            pass
         
-        # STRICT POST-GENERATION DUPLICATE CHECK
-        # Check if any of the new keywords are similar to existing ones
-        new_keywords = df['keyword'].tolist()
-        duplicate_found = False
-        duplicates = []
-        
-        for new_key in new_keywords:
-            new_key_lower = new_key.lower()
-            for old_key in keywords_to_avoid:
-                old_key_lower = old_key.lower()
-                
-                # Check for exact match
-                if new_key_lower == old_key_lower:
-                    duplicates.append(f"{new_key} (exact match with {old_key})")
-                    duplicate_found = True
-                
-                # Check if one contains the other
-                elif new_key_lower in old_key_lower or old_key_lower in new_key_lower:
-                    duplicates.append(f"{new_key} (contains/is contained in {old_key})")
-                    duplicate_found = True
-                
-                # Check for similarity (if one is a reordering of words from the other)
-                else:
-                    new_words = set(new_key_lower.split())
-                    old_words = set(old_key_lower.split())
-                    if len(new_words.intersection(old_words)) > 0 and len(new_words) <= 3 and len(old_words) <= 3:
-                        duplicates.append(f"{new_key} (shares words with {old_key})")
-                        duplicate_found = True
-        
-        # Alert if duplicates were found post-generation
-        if duplicate_found:
-            st.warning(f"Warning: Some generated keywords may still be similar to previously generated ones: {', '.join(duplicates)}")
-        
-        # Store these keywords in our session state tracker to avoid future duplicates
+        # Store these keywords in our session state tracker
         st.session_state.all_generated_keywords[topic][difficulty] = df['keyword'].tolist()
         
         # Add a numbered index starting from 1 instead of 0
