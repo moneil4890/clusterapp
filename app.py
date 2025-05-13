@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS (unchanged)
+# Custom CSS remains the same
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -447,10 +447,14 @@ def keyword_exists(keyword, existing_keywords):
 def generate_content_clusters(topic, difficulty, existing_keywords_list=None, attempt=1):
     if existing_keywords_list is None:
         existing_keywords_list = []
-        
-    # Set up LangChain with OpenAI
-    llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
     
+    # Set up LangChain with OpenAI
+    try:
+        llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
+    except Exception as e:
+        st.error(f"Failed to initialize OpenAI: {str(e)}")
+        return None
+        
     # Get difficulty-specific parameters
     difficulty_params = get_difficulty_parameters(difficulty)
     
@@ -550,52 +554,70 @@ def generate_content_clusters(topic, difficulty, existing_keywords_list=None, at
         HumanMessage(content=user_prompt)
     ]
     
-    response = llm.invoke(messages)
+    try:
+        # Set a timeout to prevent getting stuck
+        response = llm.invoke(messages)
+        response_text = response.content
+    except Exception as e:
+        st.error(f"API call failed: {str(e)}")
+        return None
     
     # Parse the JSON response with improved handling
     try:
         # Look for JSON content within the response
-        response_text = response.content
         json_start = response_text.find('{')
         json_end = response_text.rfind('}') + 1
+        
         if json_start >= 0 and json_end > json_start:
             json_str = response_text[json_start:json_end]
+            # Add debug message
+            st.session_state.generation_progress['message'] = f"Parsing JSON response for {difficulty} difficulty..."
             result = json.loads(json_str)
         else:
             # Fallback if no JSON found
-            st.error("The API response didn't contain properly formatted JSON data.")
+            st.error(f"The API response for {difficulty} difficulty didn't contain properly formatted JSON data.")
+            st.session_state.generation_error = f"Failed to find JSON data in the response for {difficulty} difficulty."
             return None
-    except json.JSONDecodeError:
-        st.error("Could not parse the API response as JSON.")
+    except json.JSONDecodeError as e:
+        st.error(f"Could not parse the API response as JSON: {str(e)}")
+        st.session_state.generation_error = f"JSON parsing error: {str(e)}"
         return None
     
     # Convert to DataFrame with exact count enforcement
     if 'keywords' in result:
-        df = pd.DataFrame(result['keywords'])
-        
-        # Filter to ensure we have exactly 1-2 word keywords
-        valid_keywords = []
-        for _, row in df.iterrows():
-            keyword = row['keyword'].strip()
-            word_count = len(keyword.split())
+        try:
+            df = pd.DataFrame(result['keywords'])
             
-            if word_count <= 2:
-                valid_keywords.append(row)
-        
-        # If we don't have enough valid keywords, this attempt failed
-        if len(valid_keywords) < 20:
+            # Filter to ensure we have exactly 1-2 word keywords
+            valid_keywords = []
+            for _, row in df.iterrows():
+                keyword = row['keyword'].strip()
+                word_count = len(keyword.split())
+                
+                if word_count <= 2:
+                    valid_keywords.append(row)
+            
+            # If we don't have enough valid keywords, this attempt failed
+            if len(valid_keywords) < 20:
+                st.session_state.generation_error = f"Only generated {len(valid_keywords)} valid keywords for {difficulty} difficulty. Need exactly 20."
+                return None
+            
+            # Take exactly 20 valid keywords
+            valid_df = pd.DataFrame(valid_keywords[:20])
+            
+            # Add a numbered index starting from 1
+            valid_df = valid_df.reset_index().rename(columns={"index": "number"})
+            valid_df['number'] = valid_df['number'] + 1  # Start numbering from 1 instead of 0
+            
+            return valid_df
+        except Exception as e:
+            st.error(f"Error processing DataFrame: {str(e)}")
+            st.session_state.generation_error = f"DataFrame processing error: {str(e)}"
             return None
-        
-        # Take exactly 20 valid keywords
-        valid_df = pd.DataFrame(valid_keywords[:20])
-        
-        # Add a numbered index starting from 1
-        valid_df = valid_df.reset_index().rename(columns={"index": "number"})
-        valid_df['number'] = valid_df['number'] + 1  # Start numbering from 1 instead of 0
-        
-        return valid_df
-    
-    return None
+    else:
+        st.error(f"Missing 'keywords' in the API response for {difficulty} difficulty.")
+        st.session_state.generation_error = "The API response is missing the 'keywords' field."
+        return None
 
 # Function to check if keywords across different difficulty levels are distinct
 def check_keyword_distinctness(clusters):
@@ -627,7 +649,6 @@ def generate_all_content_clusters(topic, max_retries=3):
     st.session_state.generation_progress['status'] = 'generating'
     st.session_state.generation_progress['message'] = f"Starting content cluster generation for '{topic}'..."
     st.session_state.generation_error = None
-    st.rerun()  # Force UI update to show progress
     
     # Track existing keywords across all difficulty levels
     all_clusters = {}
@@ -644,7 +665,6 @@ def generate_all_content_clusters(topic, max_retries=3):
         st.session_state.generation_progress['current_difficulty'] = difficulty
         st.session_state.generation_progress['message'] = f"Generating {difficulty} difficulty keywords (attempt 1)..."
         st.session_state.generation_progress['attempt_count'][difficulty] += 1
-        st.rerun()  # Force UI update
         
         # Generate initial clusters for this difficulty
         try:
@@ -695,7 +715,6 @@ def generate_all_content_clusters(topic, max_retries=3):
         st.session_state.generation_progress['current_difficulty'] = difficulty_to_regenerate
         st.session_state.generation_progress['message'] = f"Regenerating {difficulty_to_regenerate} difficulty keywords (attempt {attempt}) to reduce {difficulty_overlaps[difficulty_to_regenerate]} overlaps..."
         st.session_state.generation_progress['attempt_count'][difficulty_to_regenerate] += 1
-        st.rerun()  # Force UI update
         
         # Get all existing keywords from other difficulties
         existing_keywords = set()
@@ -744,282 +763,311 @@ def generate_all_content_clusters(topic, max_retries=3):
         elif len(df) < 20:
             # This should not happen with our controls, but just in case
             st.session_state.generation_error = f"Warning: Generated only {len(df)} keywords for {difficulty} difficulty. Please try again."
-            st.session_state.generation_progress['status'] = 'warning'
-    
-    # Set the final status
-    remaining_overlaps = sum(check_keyword_distinctness(all_clusters)[0].values())
-    if remaining_overlaps > 0:
-        st.session_state.generation_progress['message'] = f"Completed with {remaining_overlaps} remaining keyword overlaps. You may regenerate for better results."
-    else:
-        st.session_state.generation_progress['message'] = "Successfully generated distinct keyword sets for all difficulty levels!"
-    
+            # Update the session state and mark generation complete
     st.session_state.generation_progress['status'] = 'completed'
-    return all_clusters
-# Process form submission
-if submit_button:
-    if not topic:
-        st.error("Please enter a main topic of interest.")
-    else:
-        # Reset attempt counts
-        st.session_state.generation_progress['attempt_count'] = {
-            'Low': 0,
-            'Medium': 0,
-            'High': 0
-        }
-        
-        # Generate clusters for all difficulties
-        with st.spinner("Generating content clusters across all difficulty levels..."):
-            all_clusters = generate_all_content_clusters(topic, max_retries)
-            
-            if all_clusters:
-                # Store the results in session state
-                st.session_state.generated_clusters = all_clusters
-                st.session_state.last_topic = topic
-                
-                # Calculate final keyword sets
-                _, final_keywords = check_keyword_distinctness(all_clusters)
-                st.session_state.all_keywords = final_keywords
-                
-                # Reset the selected tab to "Low" for new results
-                st.session_state.selected_tab = "Low"
-                
-                # Show success message
-                st.markdown("""
-                <div class="success-message">
-                    <h3>✅ Content clusters generated successfully!</h3>
-                    <p>Your content clusters for <strong>{}</strong> are ready. 
-                    Browse through the different difficulty levels using the tabs below.</p>
-                </div>
-                """.format(topic), unsafe_allow_html=True)
-                
-                # Track successful generation (could be used for analytics)
-                if 'generation_history' not in st.session_state:
-                    st.session_state.generation_history = []
-                
-                # Add this topic to history with timestamp
-                st.session_state.generation_history.append({
-                    'topic': topic,
-                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'keyword_counts': {
-                        diff: len(keywords) for diff, keywords in final_keywords.items()
-                    },
-                    'overlaps': sum(check_keyword_distinctness(all_clusters)[0].values())
-                })
-                
-                # If we've reached our generation limit, we could show a message
-                # This can be used if you want to implement usage limits
-                # if len(st.session_state.generation_history) >= MAX_GENERATIONS:
-                #     st.warning("You've reached your daily generation limit. Please try again tomorrow.")
-            else:
-                # Handle the case where generation failed
-                st.error("Failed to generate content clusters. Please try again with a different topic or adjust parameters.")
-                
-                # If we have specific error information, display it
-                if st.session_state.generation_error:
-                    st.markdown(f"""
-                    <div class="retry-card">
-                        <h4>Error Details:</h4>
-                        <p>{st.session_state.generation_error}</p>
-                        <p>Suggestions:</p>
-                        <ul>
-                            <li>Try a more specific or different topic</li>
-                            <li>Check your internet connection</li>
-                            <li>Increase the maximum retry attempts</li>
-                        </ul>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-
-# Display progress and status updates
-if st.session_state.generation_progress['status'] != 'idle':
-    status = st.session_state.generation_progress['status']
+    st.session_state.generation_progress['message'] = f"Successfully generated distinct content clusters for '{topic}'!"
+    st.session_state.all_keywords = all_keyword_sets
     
-    # Display progress section
+    return all_clusters
+
+# Processing the form submission
+if submit_button and topic:
+    # Reset previous results if we're generating for a new topic
+    if st.session_state.last_topic != topic:
+        st.session_state.generated_clusters = {
+            'Low': None,
+            'Medium': None,
+            'High': None
+        }
+        st.session_state.all_keywords = {
+            'Low': set(),
+            'Medium': set(),
+            'High': set()
+        }
+        st.session_state.generation_progress = {
+            'status': 'idle',
+            'current_difficulty': None,
+            'attempt_count': {
+                'Low': 0,
+                'Medium': 0,
+                'High': 0
+            },
+            'message': ''
+        }
+        st.session_state.last_topic = topic
+    
+    # Generate the clusters
+    with st.spinner(f"Generating content clusters for '{topic}'..."):
+        clusters = generate_all_content_clusters(topic, max_retries)
+        
+        if clusters:
+            st.session_state.generated_clusters = clusters
+            # Show success message
+            st.markdown('<div class="success-message">', unsafe_allow_html=True)
+            st.success(f"✅ Content clusters successfully generated for '{topic}'!")
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            # Error message already displayed in the function
+            pass
+
+# Display generation progress if we're in the process
+if st.session_state.generation_progress['status'] == 'generating':
     st.markdown('<div class="progress-section">', unsafe_allow_html=True)
     
-    # Status message
-    if status == 'generating':
-        st.markdown(f"### 🔄 Generation in Progress")
-        st.markdown(f"**Current Task:** {st.session_state.generation_progress['message']}")
-        
-        # Show difficulty progress
-        current_difficulty = st.session_state.generation_progress['current_difficulty']
-        if current_difficulty:
-            st.markdown(f"**Generating:** {current_difficulty} Difficulty Keywords")
-            st.markdown(f"**Attempt:** {st.session_state.generation_progress['attempt_count'][current_difficulty]} of {max_retries}")
-            
-            # Add a progress bar based on current difficulty level
-            difficulties = ["Low", "Medium", "High"]
-            progress = (difficulties.index(current_difficulty) + 0.5) / len(difficulties)
-            st.progress(progress)
+    st.subheader("Generation Progress")
     
-    elif status == 'completed':
-        st.markdown(f"### ✅ Generation Complete")
-        st.markdown(f"**Status:** {st.session_state.generation_progress['message']}")
-        
-        # Show keyword statistics
-        overlaps, keywords = check_keyword_distinctness(st.session_state.generated_clusters)
-        total_overlaps = sum(overlaps.values())
-        
-        st.markdown("### Keyword Statistics")
-        st.markdown('<div class="keyword-stats">', unsafe_allow_html=True)
-        
-        # Display keyword counts per difficulty
-        for difficulty in ['Low', 'Medium', 'High']:
-            st.markdown(f"""
-            <div class="keyword-stat">
-                <div class="keyword-count">{len(keywords[difficulty])}</div>
-                <div class="keyword-label">{difficulty} Keywords</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        # Display overlap information
-        st.markdown(f"""
-        <div class="keyword-stat">
-            <div class="keyword-count">{total_overlaps}</div>
-            <div class="keyword-label">Keyword Overlaps</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Display specific overlap details
-        if total_overlaps > 0:
-            st.markdown("#### Overlap Details:")
-            for overlap_type, count in overlaps.items():
-                if count > 0:
-                    difficulty1, difficulty2 = overlap_type.split('_')
-                    st.markdown(f"- {count} overlaps between {difficulty1} and {difficulty2} difficulty")
+    # Show current operation
+    if st.session_state.generation_progress['current_difficulty']:
+        current_diff = st.session_state.generation_progress['current_difficulty']
+        st.markdown(f"🔄 Currently working on: **{current_diff} Difficulty Keywords** (Attempt {st.session_state.generation_progress['attempt_count'][current_diff]})")
     
-    elif status == 'error':
-        st.markdown('<div class="retry-card">', unsafe_allow_html=True)
-        st.markdown("### ❌ Generation Error")
-        st.markdown(f"**Error:** {st.session_state.generation_error}")
-        st.markdown("Please try again with a different topic or check your API connection.")
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Show message
+    if st.session_state.generation_progress['message']:
+        st.info(st.session_state.generation_progress['message'])
+    
+    # Add a progress bar
+    difficulties = ["Low", "Medium", "High"]
+    completed_difficulties = sum(1 for d in difficulties if st.session_state.generated_clusters[d] is not None)
+    progress = completed_difficulties / 3
+    
+    st.progress(progress)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Display generated clusters if available
-if st.session_state.generated_clusters['Low'] is not None:
-    st.markdown(f"## Content Clusters for: {st.session_state.last_topic}")
-    st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
-    
-    # Create tabs for different difficulty levels
+# Display error if any
+if st.session_state.generation_error:
+    st.markdown('<div class="retry-card">', unsafe_allow_html=True)
+    st.error(st.session_state.generation_error)
+    st.button("Retry Generation", key="retry_button")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Display results (only if we have results to show)
+if any(st.session_state.generated_clusters.values()):
+    # Create tabs for the different difficulty levels
     st.markdown('<div class="difficulty-tabs">', unsafe_allow_html=True)
-    tab_options = ["Low", "Medium", "High"]
     
-    # Create columns for the tabs
-    tab_cols = st.columns(len(tab_options))
+    tab1, tab2, tab3 = st.tabs(["Low Difficulty", "Medium Difficulty", "High Difficulty"])
     
-    # Default to Low difficulty if no tab is selected
-    if 'selected_tab' not in st.session_state:
-        st.session_state.selected_tab = "Low"
+    # Statistics on keywords
+    st.markdown('<div class="keyword-stats">', unsafe_allow_html=True)
     
-    # Display tabs
-    for i, tab in enumerate(tab_options):
-        with tab_cols[i]:
-            if st.button(f"{tab} Difficulty", key=f"tab_{tab}", 
-                         help=f"View {tab} difficulty keywords"):
-                st.session_state.selected_tab = tab
+    low_count = len(st.session_state.all_keywords['Low'])
+    medium_count = len(st.session_state.all_keywords['Medium'])
+    high_count = len(st.session_state.all_keywords['High'])
+    total_count = low_count + medium_count + high_count
     
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown('<div class="keyword-stat">', unsafe_allow_html=True)
+        st.markdown(f'<div class="keyword-count">{total_count}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="keyword-label">Total Keywords</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown('<div class="keyword-stat">', unsafe_allow_html=True)
+        st.markdown(f'<div class="keyword-count">{low_count}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="keyword-label">Low Difficulty</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with col3:
+        st.markdown('<div class="keyword-stat">', unsafe_allow_html=True)
+        st.markdown(f'<div class="keyword-count">{medium_count}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="keyword-label">Medium Difficulty</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with col4:
+        st.markdown('<div class="keyword-stat">', unsafe_allow_html=True)
+        st.markdown(f'<div class="keyword-count">{high_count}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="keyword-label">High Difficulty</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Display selected difficulty info card
-    selected_tab = st.session_state.selected_tab
-    difficulty_params = get_difficulty_parameters(selected_tab)
+    # Display the difficulties in tabs
+    with tab1:
+        if st.session_state.generated_clusters['Low'] is not None:
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            st.subheader(f"Low Difficulty Keywords <span class='difficulty-badge low-difficulty'>Easier to Rank</span>", unsafe_allow_html=True)
+            st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
+            
+            st.markdown("""
+            Low difficulty keywords are more specific, niche terms with minimal competition that are easier to rank for. 
+            They typically have lower search volume but higher conversion potential due to their specificity.
+            """)
+            
+            # Display the DataFrame with enhanced styling
+            st.dataframe(
+                st.session_state.generated_clusters['Low'][['number', 'keyword', 'difficulty_level', 'search_volume', 'competition_level', 'explanation', 'article_idea_1', 'article_idea_2']],
+                column_config={
+                    "number": "No.",
+                    "keyword": "Keyword",
+                    "difficulty_level": "Difficulty",
+                    "search_volume": "Est. Search Volume",
+                    "competition_level": "Competition",
+                    "explanation": "SEO Explanation",
+                    "article_idea_1": "Content Idea 1",
+                    "article_idea_2": "Content Idea 2"
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # Add download button
+            low_csv = st.session_state.generated_clusters['Low'].to_csv(index=False)
+            st.download_button(
+                label="📥 Download Low Difficulty Keywords",
+                data=low_csv,
+                file_name=f"{topic.replace(' ', '_')}_low_difficulty_keywords.csv",
+                mime="text/csv",
+                key="download_low",
+                use_container_width=True
+            )
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+    with tab2:
+        if st.session_state.generated_clusters['Medium'] is not None:
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            st.subheader(f"Medium Difficulty Keywords <span class='difficulty-badge medium-difficulty'>Moderate Competition</span>", unsafe_allow_html=True)
+            st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
+            
+            st.markdown("""
+            Medium difficulty keywords are moderately competitive terms with decent traffic potential but still attainable ranking positions. 
+            They offer a balance between search volume and competition level, ideal for established sites seeking growth.
+            """)
+            
+            # Display the DataFrame with enhanced styling
+            st.dataframe(
+                st.session_state.generated_clusters['Medium'][['number', 'keyword', 'difficulty_level', 'search_volume', 'competition_level', 'explanation', 'article_idea_1', 'article_idea_2']],
+                column_config={
+                    "number": "No.",
+                    "keyword": "Keyword",
+                    "difficulty_level": "Difficulty",
+                    "search_volume": "Est. Search Volume",
+                    "competition_level": "Competition",
+                    "explanation": "SEO Explanation",
+                    "article_idea_1": "Content Idea 1",
+                    "article_idea_2": "Content Idea 2"
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # Add download button
+            medium_csv = st.session_state.generated_clusters['Medium'].to_csv(index=False)
+            st.download_button(
+                label="📥 Download Medium Difficulty Keywords",
+                data=medium_csv,
+                file_name=f"{topic.replace(' ', '_')}_medium_difficulty_keywords.csv",
+                mime="text/csv",
+                key="download_medium",
+                use_container_width=True
+            )
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+    with tab3:
+        if st.session_state.generated_clusters['High'] is not None:
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            st.subheader(f"High Difficulty Keywords <span class='difficulty-badge high-difficulty'>Very Competitive</span>", unsafe_allow_html=True)
+            st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
+            
+            st.markdown("""
+            High difficulty keywords are highly competitive terms with strong traffic potential but difficult to rank for. 
+            These typically require significant content investment and authority building but can yield substantial traffic if successfully ranked.
+            """)
+            
+            # Display the DataFrame with enhanced styling
+            st.dataframe(
+                st.session_state.generated_clusters['High'][['number', 'keyword', 'difficulty_level', 'search_volume', 'competition_level', 'explanation', 'article_idea_1', 'article_idea_2']],
+                column_config={
+                    "number": "No.",
+                    "keyword": "Keyword",
+                    "difficulty_level": "Difficulty",
+                    "search_volume": "Est. Search Volume",
+                    "competition_level": "Competition",
+                    "explanation": "SEO Explanation",
+                    "article_idea_1": "Content Idea 1",
+                    "article_idea_2": "Content Idea 2"
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # Add download button
+            high_csv = st.session_state.generated_clusters['High'].to_csv(index=False)
+            st.download_button(
+                label="📥 Download High Difficulty Keywords",
+                data=high_csv,
+                file_name=f"{topic.replace(' ', '_')}_high_difficulty_keywords.csv",
+                mime="text/csv",
+                key="download_high",
+                use_container_width=True
+            )
+            
+            st.markdown('</div>', unsafe_allow_html=True)
     
-    # Assign appropriate CSS class for the active tab
-    tab_class = ""
-    if selected_tab == "Low":
-        tab_class = "active-low"
-    elif selected_tab == "Medium":
-        tab_class = "active-medium"
-    else:
-        tab_class = "active-high"
-    
-    # Update tab styling based on selection
-    tab_html = '<div class="difficulty-tabs">'
-    for tab in tab_options:
-        class_name = f"difficulty-tab active-{tab.lower()}" if tab == selected_tab else "difficulty-tab"
-        tab_html += f'<div class="{class_name}">{tab} Difficulty</div>'
-    tab_html += '</div>'
-    
-    st.markdown(tab_html, unsafe_allow_html=True)
-    
-    # Display info card for the selected difficulty
-    st.markdown(f"""
-    <div class="info-card">
-        <h3>{selected_tab} Difficulty Keywords <span class="difficulty-badge {selected_tab.lower()}-difficulty">{selected_tab}</span></h3>
-        <p><strong>Description:</strong> {difficulty_params['description']}</p>
-        <p><strong>Search Volume:</strong> {difficulty_params['search_volume']}</p>
-        <p><strong>Competition:</strong> {difficulty_params['competition']}</p>
-        <p><strong>Examples:</strong> {difficulty_params['examples']}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Display cluster results for selected tab
-    if st.session_state.generated_clusters[selected_tab] is not None:
+    # Option to download all keywords at once
+    if all(st.session_state.generated_clusters.values()):
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
+        st.subheader("Download All Keyword Data")
+        st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
         
-        # Format the DataFrame for better display
-        display_df = st.session_state.generated_clusters[selected_tab].copy()
+        # Combine all DataFrames into one
+        all_df = pd.concat([
+            st.session_state.generated_clusters['Low'],
+            st.session_state.generated_clusters['Medium'],
+            st.session_state.generated_clusters['High']
+        ])
         
-        # Reorder and rename columns for better display
-        display_columns = {
-            'number': '#',
-            'keyword': 'Keyword',
-            'search_volume': 'Search Volume',
-            'competition_level': 'Competition',
-            'explanation': 'Why This Difficulty Level',
-            'article_idea_1': 'Content Idea 1',
-            'article_idea_2': 'Content Idea 2'
-        }
-        
-        # Select and reorder columns if they exist
-        cols_to_display = [col for col in display_columns.keys() if col in display_df.columns]
-        display_df = display_df[cols_to_display]
-        
-        # Rename columns
-        display_df = display_df.rename(columns={k: v for k, v in display_columns.items() if k in display_df.columns})
-        
-        st.dataframe(display_df, use_container_width=True)
-        
-        # Add download button for current tab
-        csv = display_df.to_csv(index=False)
+        # Add download button for all keywords
+        all_csv = all_df.to_csv(index=False)
         st.download_button(
-            label=f"Download {selected_tab} Difficulty Keywords",
-            data=csv,
-            file_name=f"{st.session_state.last_topic.replace(' ', '_')}_{selected_tab}_keywords.csv",
+            label="📥 Download All Keywords (All Difficulty Levels)",
+            data=all_csv,
+            file_name=f"{topic.replace(' ', '_')}_all_keywords.csv",
             mime="text/csv",
-            key=f"download_{selected_tab}"
+            key="download_all",
+            use_container_width=True
         )
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Add a button to download all difficulty levels
-        st.markdown("### Download All Difficulty Levels")
+        # Content strategy recommendations
+        st.markdown('<div class="table-container">', unsafe_allow_html=True)
+        st.subheader("Content Strategy Recommendations")
+        st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
         
-        all_dfs = []
-        for diff in tab_options:
-            if st.session_state.generated_clusters[diff] is not None:
-                temp_df = st.session_state.generated_clusters[diff].copy()
-                temp_df['difficulty'] = diff  # Add the difficulty level as a column
-                all_dfs.append(temp_df)
+        st.markdown("""
+        ### How to Use These Keywords in Your Content Strategy:
         
-        if all_dfs:
-            combined_df = pd.concat(all_dfs)
-            combined_csv = combined_df.to_csv(index=False)
-            
-            st.download_button(
-                label="Download All Keywords (Combined CSV)",
-                data=combined_csv,
-                file_name=f"{st.session_state.last_topic.replace(' ', '_')}_all_keywords.csv",
-                mime="text/csv",
-                key="download_all"
-            )
+        1. **Build a Topic Cluster Structure:**
+           - Use higher difficulty keywords as "pillar" content
+           - Create supporting content using medium and low difficulty keywords
+           - Interlink all related content pieces
+        
+        2. **Strategic Content Creation Order:**
+           - Start with low difficulty keywords to gain initial traction
+           - Progress to medium difficulty as your site authority grows
+           - Target high difficulty keywords once you've established topical authority
+        
+        3. **Content Format Suggestions:**
+           - Low Difficulty: How-to guides, tutorials, FAQs, specialized information
+           - Medium Difficulty: Comprehensive guides, case studies, industry insights
+           - High Difficulty: Definitive guides, original research, expert interviews
+        
+        4. **Publishing Cadence:**
+           - Aim for at least 2-3 new content pieces weekly in the first months
+           - Focus on quality and comprehensive coverage rather than quantity
+           - Maintain a consistent publishing schedule
+        """)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# Add a footer
-st.markdown('<footer>', unsafe_allow_html=True)
-st.markdown('© 2023 Content Cluster Generator | Created with ❤️ by SEO Pros')
-st.markdown('</footer>', unsafe_allow_html=True)
+# Add footer
+st.markdown("""
+<footer>
+    <p>© 2023 Content Cluster Generator | Powered by OpenAI | Created with ❤️ using Streamlit</p>
+</footer>
+""", unsafe_allow_html=True)
